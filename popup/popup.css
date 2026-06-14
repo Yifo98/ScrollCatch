@@ -61,8 +61,48 @@ h1 {
   margin: 0;
 }
 
-.notice strong {
-  color: #78350f;
+.shortcut-card {
+  display: grid;
+  gap: 7px;
+  padding: 10px;
+  border: 1px solid rgba(37, 99, 235, 0.22);
+  border-left: 4px solid #2563eb;
+  border-radius: 7px;
+  background: linear-gradient(90deg, rgba(37, 99, 235, 0.11), rgba(20, 184, 166, 0.07));
+  color: #1e3a8a;
+}
+
+.shortcut-card p {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  margin: 0;
+}
+
+.shortcut-card span {
+  min-width: 0;
+}
+
+.shortcut-title {
+  color: #0f766e;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.shortcut-card kbd {
+  flex: 0 0 auto;
+  min-width: 42px;
+  padding: 2px 6px;
+  border: 1px solid rgba(15, 23, 42, 0.16);
+  border-bottom-color: rgba(15, 23, 42, 0.28);
+  border-radius: 5px;
+  background: #fff;
+  box-shadow: 0 1px 0 rgba(15, 23, 42, 0.14);
+  color: #172026;
+  font: 11px/1.5 ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-weight: 800;
+  text-align: center;
 }
 
 button {

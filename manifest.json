@@ -3,7 +3,7 @@
   "name": "XF FullPage Capture Sections",
   "short_name": "XF Sections",
   "description": "Capture long pages in sections, manage cached sections, then export PNG, JPEG, paginated images, or merged PDFs.",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "homepage_url": "https://github.com/Yifo98/XF-FullPage-Capture",
   "icons": {
     "16": "icons/icon-16.png",

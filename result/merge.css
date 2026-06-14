@@ -231,6 +231,32 @@ label {
   color: #475569;
 }
 
+.pagination-shortcut-hint {
+  display: grid;
+  gap: 2px;
+  padding: 9px 10px;
+  border: 1px solid rgba(37, 99, 235, 0.22);
+  border-left: 4px solid #2563eb;
+  background: linear-gradient(90deg, rgba(37, 99, 235, 0.11), rgba(20, 184, 166, 0.07));
+  color: #1e3a8a;
+  font-weight: 700;
+}
+
+.pagination-shortcut-hint::before {
+  content: "自定义分页快捷键";
+  color: #0f766e;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.pagination-shortcut-hint.is-active {
+  border-color: rgba(15, 118, 110, 0.34);
+  border-left-color: #0f766e;
+  background: linear-gradient(90deg, rgba(20, 184, 166, 0.16), rgba(37, 99, 235, 0.09));
+  color: #115e59;
+  box-shadow: 0 0 0 2px rgba(15, 118, 110, 0.07);
+}
+
 .status {
   margin: 0;
   padding-top: 12px;
@@ -437,7 +463,7 @@ label {
 .page-overlay {
   position: absolute;
   inset: 0;
-  z-index: 7;
+  z-index: 12;
   pointer-events: none;
 }
 
@@ -513,7 +539,7 @@ label {
 .page-line {
   position: absolute;
   left: 0;
-  z-index: 5;
+  z-index: 12;
   width: 100%;
   height: 24px;
   transform: translateY(-12px);
@@ -528,17 +554,17 @@ label {
   top: 50%;
   left: 0;
   right: 0;
-  height: 5px;
+  height: 3px;
   transform: translateY(-50%);
   border-radius: 999px;
-  background: #2563eb;
-  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.92), 0 1px 7px rgba(15, 23, 42, 0.28);
+  background: rgba(37, 99, 235, 0.9);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.86), 0 1px 5px rgba(15, 23, 42, 0.2);
   content: "";
 }
 
 .page-line:hover::before {
-  height: 7px;
-  background: #1d4ed8;
+  height: 4px;
+  background: rgba(29, 78, 216, 0.96);
 }
 
 .page-line:active {
@@ -551,26 +577,28 @@ label {
   top: 50%;
   right: 8px;
   transform: translateY(-50%);
-  padding: 2px 6px;
+  padding: 1px 5px;
   border-radius: 999px;
   background: #2563eb;
   color: #fff;
-  font-size: 11px;
+  font-size: 10px;
   font-weight: 800;
+  opacity: 0.86;
 }
 
 .page-line.is-active {
-  z-index: 6;
+  z-index: 13;
 }
 
 .page-line.is-active::before {
-  height: 7px;
-  background: #0f766e;
-  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.96), 0 0 0 5px rgba(15, 118, 110, 0.24), 0 2px 9px rgba(15, 23, 42, 0.28);
+  height: 4px;
+  background: rgba(15, 118, 110, 0.96);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.92), 0 0 0 3px rgba(15, 118, 110, 0.16), 0 2px 6px rgba(15, 23, 42, 0.2);
 }
 
 .page-line.is-active::after {
   background: #0f766e;
+  opacity: 0.95;
 }
 
 .page-line.is-risk::before {

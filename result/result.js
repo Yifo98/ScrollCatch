@@ -33,6 +33,7 @@ const elements = {
   cropVisible: document.querySelector("#cropVisible"),
   customPagination: document.querySelector("#customPagination"),
   paginationWorkflowInfo: document.querySelector("#paginationWorkflowInfo"),
+  paginationShortcutHint: document.querySelector("#paginationShortcutHint"),
   seedPageCuts: document.querySelector("#seedPageCuts"),
   addPageCut: document.querySelector("#addPageCut"),
   deletePageCut: document.querySelector("#deletePageCut"),
@@ -2062,6 +2063,7 @@ function updatePageGuideText(cuts, isCustom, pdfRisk) {
   const paperLabel = elements.paper.selectedOptions[0]?.textContent || "A4";
   elements.pageGuideInfo.textContent = `${paperLabel} ${orientationLabel}：约 ${pageCount} 页`;
   updatePaginationWorkflowInfo(isCustom);
+  updatePaginationShortcutHint(isCustom);
   if (isCustom) {
     const parts = normalizeManualCutFractions().map((fraction) => `${Math.round(fraction * 100)}%`);
     const selected = selectedPageCutIndex >= 0 && selectedPageCutIndex < parts.length
@@ -2102,6 +2104,23 @@ function updatePaginationWorkflowInfo(isCustom) {
 
   elements.paginationWorkflowInfo.classList.add("is-manual");
   elements.paginationWorkflowInfo.textContent = "当前分页线已手动编辑；调整选区后会刷新风险提示，不会覆盖你手动挪好的分页线。";
+}
+
+function updatePaginationShortcutHint(isCustom) {
+  if (!elements.paginationShortcutHint) {
+    return;
+  }
+
+  elements.paginationShortcutHint.classList.toggle("is-active", isCustom);
+  if (!isCustom) {
+    elements.paginationShortcutHint.textContent = "开启自定义分页线后可用：A / + / = 新增分页线；Delete / Backspace 删除选中线。";
+    return;
+  }
+
+  const hasSelection = selectedPageCutIndex >= 0 && selectedPageCutIndex < manualCutFractions.length;
+  elements.paginationShortcutHint.textContent = hasSelection
+    ? "当前可用：拖动分页线调整位置；A / + / = 新增；Delete / Backspace 删除选中线。"
+    : "当前可用：拖动分页线调整位置；A / + / = 在鼠标位置新增分页线。";
 }
 
 function createEmptyPdfRiskAnalysis() {

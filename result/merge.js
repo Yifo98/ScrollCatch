@@ -33,6 +33,7 @@ const elements = {
   customPagination: document.querySelector("#customPagination"),
   pageRangeMode: document.querySelector("#pageRangeMode"),
   pageRiskInfo: document.querySelector("#pageRiskInfo"),
+  paginationShortcutHint: document.querySelector("#paginationShortcutHint"),
   seedPageCuts: document.querySelector("#seedPageCuts"),
   addPageCut: document.querySelector("#addPageCut"),
   deletePageCut: document.querySelector("#deletePageCut"),
@@ -662,6 +663,7 @@ function renderActiveControls() {
   elements.clearPageCuts.disabled = !state.customPagination || state.manualCutFractions.length === 0;
   elements.pageRangeMode.disabled = !state.customPagination;
   renderPageCutInfo(section);
+  updatePaginationShortcutHint(section);
   updateSectionOverlay(section);
 }
 
@@ -685,6 +687,24 @@ function renderPageCutInfo(section) {
   const analysis = analyzeSectionPageRanges(section, cuts, exportState);
   elements.pageCutList.textContent = `${fractions.length} 条：${fractions.join(" / ")}${selected}`;
   updatePageRiskInfo(analysis);
+}
+
+function updatePaginationShortcutHint(section) {
+  if (!elements.paginationShortcutHint) {
+    return;
+  }
+
+  const isCustom = Boolean(section?.state?.customPagination);
+  elements.paginationShortcutHint.classList.toggle("is-active", isCustom);
+  if (!isCustom) {
+    elements.paginationShortcutHint.textContent = "开启自定义分页线后可用：A / + / = 新增分页线；Delete / Backspace 删除选中线。";
+    return;
+  }
+
+  const hasSelection = section.state.selectedPageCutIndex >= 0;
+  elements.paginationShortcutHint.textContent = hasSelection
+    ? "当前可用：拖动分页线调整位置；A / + / = 新增；Delete / Backspace 删除选中线。"
+    : "当前可用：拖动分页线调整位置；A / + / = 在当前可见区域新增分页线。";
 }
 
 function moveActiveSection(direction) {

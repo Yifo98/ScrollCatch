@@ -1,8 +1,18 @@
 # XF FullPage Capture Sections
 
-一个以 `1.0.0` 为主线的 Chromium 浏览器扩展，用来截取完整长页面、管理多段截图、裁切分页，并将结果导出为 PNG、JPEG、分页图片 ZIP 或合并 PDF。
+一个以 `1.0.1` 为主线的 Chromium 浏览器扩展，用来截取完整长页面、管理多段截图、裁切分页，并将结果导出为 PNG、JPEG、分页图片 ZIP 或合并 PDF。
 
 隐私政策：[`PRIVACY.md`](./PRIVACY.md)
+
+GitHub：<https://github.com/Yifo98/XF-FullPage-Capture>
+
+## 1.0.1 更新摘要
+
+- 优化普通结果页和分节合并编辑器里的自定义分页线：线条更细，不遮挡正文，同时保留可拖拽热区。
+- 减轻 PDF 参考区的遮挡感，让参考范围仍可见，但不压住截图内容。
+- 统一普通结果页、分节合并编辑器和扩展弹窗的快捷键提示样式。
+- 在自定义分页区域补充更明确的操作指引，建议先框选正文范围，再开启自定义分页线。
+- 优化截图结果页和合并编辑器的加载提示，处理长图切片时会显示从左到右循环的加载动画。
 
 适用浏览器：
 
@@ -49,27 +59,27 @@
 
 ### Chrome
 
-1. 解压 `XF-FullPage-Capture-1.0.0.zip`。
+1. 解压 `XF-FullPage-Capture-1.0.1.zip`。
 2. 打开 `chrome://extensions/`。
 3. 打开右上角 `Developer mode`。
 4. 点击 `Load unpacked`。
-5. 选择解压后的 `XF-FullPage-Capture-1.0.0` 文件夹。
+5. 选择解压后的 `XF-FullPage-Capture-1.0.1` 文件夹。
 
 ### Edge
 
-1. 解压 `XF-FullPage-Capture-1.0.0.zip`。
+1. 解压 `XF-FullPage-Capture-1.0.1.zip`。
 2. 打开 `edge://extensions/`。
 3. 打开 `Developer mode`。
 4. 点击 `Load unpacked`。
-5. 选择解压后的 `XF-FullPage-Capture-1.0.0` 文件夹。
+5. 选择解压后的 `XF-FullPage-Capture-1.0.1` 文件夹。
 
 ### Atlas
 
-1. 解压 `XF-FullPage-Capture-1.0.0.zip`。
+1. 解压 `XF-FullPage-Capture-1.0.1.zip`。
 2. 优先尝试打开 `chrome://extensions/`。
 3. 如果没有进入扩展管理页，就从浏览器工具栏的扩展入口进入管理页面。
 4. 打开开发者模式后，选择 `Load unpacked`。
-5. 选择解压后的 `XF-FullPage-Capture-1.0.0` 文件夹。
+5. 选择解压后的 `XF-FullPage-Capture-1.0.1` 文件夹。
 
 ## 使用
 
@@ -191,7 +201,7 @@ Chrome 不允许扩展在 `chrome://`、Chrome Web Store、浏览器内部设置
 
 ### 打包后朋友怎么安装？
 
-把 `dist/XF-FullPage-Capture-1.0.0.zip` 发给对方。对方解压后，在浏览器扩展管理页选择解压出的文件夹并加载即可。
+把 `dist/XF-FullPage-Capture-1.0.1.zip` 发给对方。对方解压后，在浏览器扩展管理页选择解压出的文件夹并加载即可。
 
 ## 发布打包
 
