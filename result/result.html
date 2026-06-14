@@ -24,6 +24,33 @@
 
     <main class="workspace">
       <aside class="panel">
+        <section id="segmentSection" class="panel-section" hidden>
+          <h2>分段</h2>
+          <p id="segmentInfo" class="hint-text">本次截图已完成。</p>
+          <p id="segmentActionInfo" class="hint-text warning-text">请先导出当前段，再回到原文继续选择下一段。</p>
+          <div class="segment-actions">
+            <button id="openSourceAtEnd" type="button" disabled>回到原文结束位置</button>
+            <button id="startSourceAtEnd" type="button" disabled>从结束位置继续截取</button>
+          </div>
+        </section>
+
+        <section id="sectionManagerSection" class="panel-section">
+          <h2>分节合并</h2>
+          <p id="sectionMergeInfo" class="hint-text">可把多段截图按顺序合并导出为一份 PDF。</p>
+          <div class="mini-actions">
+            <button id="refreshSections" type="button" disabled>刷新分节</button>
+            <button id="openMergeEditor" type="button" aria-label="进入合并编辑器" title="进入合并编辑器" disabled>合并编辑</button>
+          </div>
+          <div class="mini-actions">
+            <button id="moveSectionUp" type="button" disabled>上移</button>
+            <button id="moveSectionDown" type="button" disabled>下移</button>
+          </div>
+          <div id="sectionList" class="section-list" aria-live="polite"></div>
+          <p class="hint-text warning-text">合并编辑器主要用于第一次没有截完整篇文章、需要分多节继续截取的情况。一次性截完时，直接在本页分页和导出即可。</p>
+          <p class="hint-text warning-text">页面内容过多时，先点击「从结束位置继续截取」获取剩余页面；截完多节后进入合并编辑器统一分页、合并及导出。</p>
+          <p class="hint-text">进入合并编辑器后，可在同一页面并排查看多节截图，并分别调整裁切、缩放和分页线；也可以把当前节参数套用到全部分节。</p>
+        </section>
+
         <section class="panel-section">
           <h2>分页</h2>
           <label>
@@ -46,14 +73,10 @@
             </select>
           </label>
           <label class="check-row">
-            <input id="smartSplit" type="checkbox" checked>
-            智能避开文字切页
-          </label>
-          <label class="check-row">
             <input id="includeMeta" type="checkbox" checked>
             分页页脚显示页码和时间
           </label>
-          <p id="pageGuideInfo" class="hint-text">分页线会显示在右侧预览里。</p>
+          <p id="pageGuideInfo" class="hint-text">分页线会显示在右侧预览里。工作区预览如有模糊属正常，分页导出会使用原始切片，不影响导出清晰度。如果截取画面过多，内容预览会比较慢，请耐心等待。</p>
         </section>
 
         <section class="panel-section">

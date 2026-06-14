@@ -1,9 +1,10 @@
 {
   "manifest_version": 3,
-  "name": "XF FullPage Capture",
-  "short_name": "XF Capture",
-  "description": "Capture full pages and inner scroll containers, then export PNG, JPEG, paginated images, or PDF.",
-  "version": "0.4.8",
+  "name": "XF FullPage Capture Sections",
+  "short_name": "XF Sections",
+  "description": "Capture long pages in sections, manage cached sections, then export PNG, JPEG, paginated images, or merged PDFs.",
+  "version": "1.0.0",
+  "homepage_url": "https://github.com/Yifo98/XF-FullPage-Capture",
   "icons": {
     "16": "icons/icon-16.png",
     "32": "icons/icon-32.png",
@@ -11,7 +12,8 @@
     "128": "icons/icon-128.png"
   },
   "action": {
-    "default_title": "XF FullPage Capture",
+    "default_title": "XF FullPage Capture Sections",
+    "default_popup": "popup/popup.html",
     "default_icon": {
       "16": "icons/icon-16.png",
       "32": "icons/icon-32.png",
@@ -22,6 +24,15 @@
   "background": {
     "service_worker": "background.js",
     "type": "module"
+  },
+  "commands": {
+    "stop-capture": {
+      "suggested_key": {
+        "default": "Alt+Shift+S",
+        "mac": "Alt+Shift+S"
+      },
+      "description": "Stop the current XF FullPage Capture job"
+    }
   },
   "permissions": [
     "activeTab",

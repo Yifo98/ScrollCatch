@@ -8,6 +8,11 @@ const elements = {
   canvas: document.querySelector("#preview"),
   canvasStage: document.querySelector("#canvasStage"),
   cropOverlay: document.querySelector("#cropOverlay"),
+  segmentSection: document.querySelector("#segmentSection"),
+  segmentInfo: document.querySelector("#segmentInfo"),
+  segmentActionInfo: document.querySelector("#segmentActionInfo"),
+  openSourceAtEnd: document.querySelector("#openSourceAtEnd"),
+  startSourceAtEnd: document.querySelector("#startSourceAtEnd"),
   savePng: document.querySelector("#savePng"),
   savePagedPng: document.querySelector("#savePagedPng"),
   saveJpeg: document.querySelector("#saveJpeg"),
@@ -15,7 +20,6 @@ const elements = {
   savePdf: document.querySelector("#savePdf"),
   paper: document.querySelector("#paper"),
   orientation: document.querySelector("#orientation"),
-  smartSplit: document.querySelector("#smartSplit"),
   includeMeta: document.querySelector("#includeMeta"),
   pageGuideInfo: document.querySelector("#pageGuideInfo"),
   enableCrop: document.querySelector("#enableCrop"),
@@ -39,6 +43,12 @@ const elements = {
   deleteCaptureCache: document.querySelector("#deleteCaptureCache"),
   cacheList: document.querySelector("#cacheList"),
   cacheInfo: document.querySelector("#cacheInfo"),
+  refreshSections: document.querySelector("#refreshSections"),
+  openMergeEditor: document.querySelector("#openMergeEditor"),
+  moveSectionUp: document.querySelector("#moveSectionUp"),
+  moveSectionDown: document.querySelector("#moveSectionDown"),
+  sectionList: document.querySelector("#sectionList"),
+  sectionMergeInfo: document.querySelector("#sectionMergeInfo"),
   reloadInfo: document.querySelector("#reloadInfo"),
   pageGuideOverlay: document.querySelector("#pageGuideOverlay")
 };
@@ -65,6 +75,10 @@ let isRestoringEditorState = false;
 let isEditorStateReady = false;
 let hasDeletedCaptureCache = false;
 let compositionInfo = null;
+let sectionMergeItems = [];
+let sectionMergeOrder = [];
+let selectedSectionIds = new Set();
+let activeSectionId = "";
 
 const EDITOR_STATE_VERSION = 1;
 const EDITOR_STATE_PREFIX = "xfFullPageCapture:editor:";
@@ -174,7 +188,7 @@ elements.exportScale.addEventListener("input", () => {
   scheduleEditorStateSave();
 });
 
-for (const input of [elements.paper, elements.orientation, elements.smartSplit, elements.includeMeta]) {
+for (const input of [elements.paper, elements.orientation, elements.includeMeta]) {
   input.addEventListener("change", () => {
     updatePageGuides();
     scheduleEditorStateSave();
@@ -236,6 +250,20 @@ elements.deleteCaptureCache.addEventListener("click", () => {
   });
 });
 
+elements.openSourceAtEnd.addEventListener("click", () => {
+  openSourceAtSegmentEnd().catch((error) => {
+    reportHandledError(error);
+    setStatus(error.message || String(error), true);
+  });
+});
+
+elements.startSourceAtEnd.addEventListener("click", () => {
+  startCaptureAtSegmentEnd().catch((error) => {
+    reportHandledError(error);
+    setStatus(error.message || String(error), true);
+  });
+});
+
 elements.cacheList.addEventListener("click", (event) => {
   const button = event.target.closest?.("button[data-cache-action]");
   if (!button) {
@@ -248,7 +276,7 @@ elements.cacheList.addEventListener("click", (event) => {
   }
 
   if (button.dataset.cacheAction === "open") {
-    window.open(chrome.runtime.getURL(`result/result.html?id=${encodeURIComponent(id)}`), "_blank", "noopener");
+    openCaptureResult(id);
     return;
   }
 
@@ -258,6 +286,55 @@ elements.cacheList.addEventListener("click", (event) => {
       setStatus(error.message || String(error), true);
     });
   }
+});
+
+elements.refreshSections.addEventListener("click", () => {
+  refreshSectionManager().catch((error) => {
+    reportHandledError(error);
+    setStatus(error.message || String(error), true);
+  });
+});
+
+elements.openMergeEditor.addEventListener("click", () => {
+  openMergeEditor();
+});
+
+elements.moveSectionUp.addEventListener("click", () => {
+  moveActiveSection(-1);
+});
+
+elements.moveSectionDown.addEventListener("click", () => {
+  moveActiveSection(1);
+});
+
+elements.sectionList.addEventListener("click", (event) => {
+  const item = event.target.closest?.("[data-section-id]");
+  if (!item) {
+    return;
+  }
+  activeSectionId = item.dataset.sectionId || "";
+  renderSectionManager();
+});
+
+elements.sectionList.addEventListener("change", (event) => {
+  const input = event.target.closest?.("input[data-section-id]");
+  if (!input) {
+    return;
+  }
+  const id = input.dataset.sectionId;
+  if (input.checked) {
+    selectedSectionIds.add(id);
+    if (!sectionMergeOrder.includes(id)) {
+      sectionMergeOrder.push(id);
+    }
+    activeSectionId = id;
+  } else {
+    selectedSectionIds.delete(id);
+    if (activeSectionId === id) {
+      activeSectionId = [...selectedSectionIds].at(-1) || "";
+    }
+  }
+  renderSectionManager();
 });
 
 elements.canvasStage.addEventListener("pointerdown", startCropDrag);
@@ -317,7 +394,8 @@ async function init() {
   markLifecycleEvent("init");
   updateReloadDiagnostics();
   elements.title.textContent = capture.source.title || "完整页面截图";
-  elements.meta.textContent = `${capture.target.label} · ${capture.target.mode === "inner-scroll" ? "内层滚动容器" : "页面滚动"} · ${capture.slices.length} 张切片 · ${capture.source.url}`;
+  elements.meta.textContent = `${capture.target.label} · ${capture.target.mode === "inner-scroll" ? "内层滚动容器" : "页面滚动"} · ${capture.slices.length} 张切片${formatSegmentMeta()} · ${capture.source.url}`;
+  updateSegmentControls();
   setStatus("正在拼接截图切片...");
 
   await composePreview();
@@ -338,6 +416,121 @@ async function init() {
     ? `已恢复上次编辑草稿：${elements.canvas.width} x ${elements.canvas.height}px。${sizeNote}`
     : `拼接完成：${elements.canvas.width} x ${elements.canvas.height}px。${sizeNote}`);
   updateReloadDiagnostics();
+}
+
+function formatSegmentMeta() {
+  if (!capture?.segment || (capture.segment.part || 1) <= 1 && !hasSegmentResumePosition(capture.segment) && capture.segment.reason === "complete") {
+    return "";
+  }
+  return ` · 第 ${capture.segment.part || 1} 段`;
+}
+
+function updateSegmentControls() {
+  if (!elements.segmentSection || !elements.openSourceAtEnd || !elements.startSourceAtEnd) {
+    return;
+  }
+
+  const segment = capture?.segment;
+  const canReturn = hasSegmentResumePosition(segment);
+  const shouldShow = Boolean(segment && ((segment.part || 1) > 1 || canReturn || segment.reason !== "complete"));
+  elements.segmentSection.hidden = !shouldShow;
+  if (!shouldShow) {
+    return;
+  }
+
+  const start = Math.round(segment.startScrollTop || 0);
+  const end = Math.round(segment.endScrollTop || capture.target.totalHeight || 0);
+  const full = Math.round(segment.fullTotalHeight || end);
+  const range = full > 0 ? `${Math.round(start / 100) / 10}k-${Math.round(end / 100) / 10}k / ${Math.round(full / 100) / 10}k px` : "";
+  const reason = describeSegmentReason(segment.reason);
+  const limit = segment.limitHeight ? `单段上限 ${Math.round(segment.limitHeight / 100) / 10}k px` : "";
+  elements.segmentInfo.textContent = [
+    `第 ${segment.part || 1} 段`,
+    reason,
+    range,
+    limit
+  ].filter(Boolean).join(" · ");
+  elements.segmentActionInfo.textContent = getSegmentActionMessage(segment, canReturn);
+  elements.openSourceAtEnd.disabled = !canReturn;
+  elements.startSourceAtEnd.disabled = !canReturn;
+}
+
+async function openSourceAtSegmentEnd() {
+  if (!hasSegmentResumePosition(capture?.segment)) {
+    setStatus("当前截图没有可返回的原文结束位置。");
+    return;
+  }
+
+  setBusy(true, "正在回到原文结束位置...");
+  try {
+    const response = await chrome.runtime.sendMessage({
+      type: "OPEN_SOURCE_AT_SCROLL",
+      captureId
+    });
+    if (!response?.ok) {
+      throw new Error(response?.error || "Could not return to the source page.");
+    }
+    setStatus("已回到原文结束位置。可在扩展弹窗选择“从当前位置开始截图”。");
+  } finally {
+    setBusy(false);
+  }
+}
+
+async function startCaptureAtSegmentEnd() {
+  if (!hasSegmentResumePosition(capture?.segment)) {
+    setStatus("当前截图没有可继续截取的原文位置。");
+    return;
+  }
+
+  setBusy(true, "正在回到原文结束位置并继续截图...");
+  try {
+    const response = await chrome.runtime.sendMessage({
+      type: "START_CAPTURE_FROM_SOURCE_SCROLL",
+      captureId
+    });
+    if (!response?.ok) {
+      throw new Error(response?.error || "Could not start from the source page position.");
+    }
+    setStatus("已从原文结束位置继续截图。新结果页会自动打开。");
+  } finally {
+    setBusy(false);
+  }
+}
+
+function hasSegmentResumePosition(segment) {
+  return Number.isFinite(Number(segment?.nextScrollTop)) || Number.isFinite(Number(segment?.endScrollTop));
+}
+
+function getSegmentActionMessage(segment, canReturn) {
+  if (segment?.reason === "segment-limit") {
+    return canReturn
+      ? "已到达插件单段上限。请先导出当前段，再从结束位置继续截取下一段；也可以先回到原文确认位置。"
+      : "已到达插件单段上限。请先导出当前段；当前缓存没有可返回的原文位置。";
+  }
+  if (segment?.reason === "user-stop") {
+    return canReturn
+      ? "已按停止导出当前段。可以先保存，再回到原文结束位置继续选择下一段。"
+      : "已按停止导出当前段。";
+  }
+  return canReturn
+    ? "可以先导出当前段，再回到原文结束位置继续选择下一段。"
+    : "当前段已完成。";
+}
+
+function describeSegmentReason(reason) {
+  if (reason === "segment-limit") {
+    return "到达本段上限";
+  }
+  if (reason === "user-stop") {
+    return "手动停止";
+  }
+  if (reason === "range-end") {
+    return "到达自定义终点";
+  }
+  if (reason === "scroll-stalled") {
+    return "页面不再继续滚动";
+  }
+  return "已完成";
 }
 
 function lifecycleStateKey() {
@@ -480,7 +673,11 @@ function formatLifecycleEvent(event) {
 }
 
 function editorStateKey() {
-  return `${EDITOR_STATE_PREFIX}${captureId}`;
+  return editorStateKeyForCapture(captureId);
+}
+
+function editorStateKeyForCapture(targetCaptureId) {
+  return `${EDITOR_STATE_PREFIX}${targetCaptureId}`;
 }
 
 function restoreEditorState() {
@@ -496,9 +693,6 @@ function restoreEditorState() {
     }
     if (state.orientation === "portrait" || state.orientation === "landscape") {
       elements.orientation.value = state.orientation;
-    }
-    if (typeof state.smartSplit === "boolean") {
-      elements.smartSplit.checked = state.smartSplit;
     }
     if (typeof state.includeMeta === "boolean") {
       elements.includeMeta.checked = state.includeMeta;
@@ -529,15 +723,19 @@ function restoreEditorState() {
 }
 
 function readSavedEditorState() {
+  return readSavedEditorStateForCapture(captureId);
+}
+
+function readSavedEditorStateForCapture(targetCaptureId) {
   try {
-    const raw = localStorage.getItem(editorStateKey());
+    const raw = localStorage.getItem(editorStateKeyForCapture(targetCaptureId));
     if (!raw) {
       return null;
     }
     const state = JSON.parse(raw);
     return state?.version === EDITOR_STATE_VERSION ? state : null;
   } catch (error) {
-    console.warn("Could not restore editor state.", error);
+    console.warn("Could not read editor state.", error);
     return null;
   }
 }
@@ -556,10 +754,20 @@ function saveEditorStateNow() {
   }
 
   clearTimeout(editorStateSaveTimer);
+  const state = buildCurrentEditorState();
+
+  try {
+    localStorage.setItem(editorStateKey(), JSON.stringify(state));
+  } catch (error) {
+    console.warn("Could not save editor state.", error);
+  }
+}
+
+function buildCurrentEditorState() {
   const crop = elements.enableCrop.checked
     ? normalizeCropRect(readCropInputs())
     : { x: 0, y: 0, width: elements.canvas.width || 1, height: elements.canvas.height || 1 };
-  const state = {
+  return {
     version: EDITOR_STATE_VERSION,
     savedAt: new Date().toISOString(),
     canvas: {
@@ -568,7 +776,6 @@ function saveEditorStateNow() {
     },
     paper: elements.paper.value,
     orientation: elements.orientation.value,
-    smartSplit: elements.smartSplit.checked,
     includeMeta: elements.includeMeta.checked,
     enableCrop: elements.enableCrop.checked,
     crop,
@@ -576,12 +783,6 @@ function saveEditorStateNow() {
     customPagination: elements.customPagination.checked,
     manualCutFractions: [...normalizeManualCutFractions()]
   };
-
-  try {
-    localStorage.setItem(editorStateKey(), JSON.stringify(state));
-  } catch (error) {
-    console.warn("Could not save editor state.", error);
-  }
 }
 
 function canSaveEditorState() {
@@ -607,6 +808,151 @@ async function refreshCaptureCacheList() {
   }
   renderCaptureCacheList(response.captures || []);
   updateCacheControls(response.captures || []);
+  updateSectionManagerFromCaptures(response.captures || []);
+}
+
+async function refreshSectionManager() {
+  const response = await chrome.runtime.sendMessage({ type: "LIST_CAPTURES" });
+  if (!response?.ok) {
+    throw new Error(response?.error || "Could not list cached captures.");
+  }
+  updateSectionManagerFromCaptures(response.captures || [], { resetSelection: false });
+  setStatus("分节列表已刷新。");
+}
+
+function updateSectionManagerFromCaptures(items, options = {}) {
+  const previousSelection = new Set(selectedSectionIds);
+  const previousOrder = sectionMergeOrder.filter((id) => items.some((item) => item.id === id));
+  sectionMergeItems = sortSectionMergeItems(items);
+
+  if (!selectedSectionIds.size || options.resetSelection) {
+    selectedSectionIds = new Set(defaultSectionSelection(sectionMergeItems));
+  } else {
+    selectedSectionIds = new Set([...previousSelection].filter((id) => sectionMergeItems.some((item) => item.id === id)));
+    if (!selectedSectionIds.size && captureId) {
+      selectedSectionIds.add(captureId);
+    }
+  }
+
+  const defaultOrder = sectionMergeItems.map((item) => item.id);
+  sectionMergeOrder = [
+    ...previousOrder.filter((id) => selectedSectionIds.has(id)),
+    ...defaultOrder.filter((id) => selectedSectionIds.has(id) && !previousOrder.includes(id))
+  ];
+  activeSectionId = selectedSectionIds.has(activeSectionId) ? activeSectionId : sectionMergeOrder[0] || "";
+  renderSectionManager();
+}
+
+function sortSectionMergeItems(items) {
+  return [...items].sort((a, b) => {
+    const aSame = a.url === capture?.source?.url ? 0 : 1;
+    const bSame = b.url === capture?.source?.url ? 0 : 1;
+    if (aSame !== bSame) {
+      return aSame - bSame;
+    }
+    const aSegment = Number(a.segment?.startScrollTop);
+    const bSegment = Number(b.segment?.startScrollTop);
+    if (Number.isFinite(aSegment) && Number.isFinite(bSegment) && aSegment !== bSegment) {
+      return aSegment - bSegment;
+    }
+    const aPart = Number(a.segment?.part);
+    const bPart = Number(b.segment?.part);
+    if (Number.isFinite(aPart) && Number.isFinite(bPart) && aPart !== bPart) {
+      return aPart - bPart;
+    }
+    return new Date(a.capturedAt).getTime() - new Date(b.capturedAt).getTime();
+  });
+}
+
+function defaultSectionSelection(items) {
+  const sameSource = items.filter((item) => item.url && item.url === capture?.source?.url).map((item) => item.id);
+  return sameSource.length ? sameSource : [captureId].filter(Boolean);
+}
+
+function renderSectionManager() {
+  if (!elements.sectionList) {
+    return;
+  }
+
+  const orderedItems = getOrderedSectionItems();
+  elements.sectionList.replaceChildren();
+
+  if (!sectionMergeItems.length) {
+    const empty = document.createElement("p");
+    empty.className = "hint-text";
+    empty.textContent = "暂无可合并的截图节。";
+    elements.sectionList.appendChild(empty);
+  } else {
+    for (const item of orderedItems) {
+      elements.sectionList.appendChild(renderSectionItem(item));
+    }
+  }
+
+  const selectedCount = selectedSectionIds.size;
+  const totalHeight = orderedItems
+    .filter((item) => selectedSectionIds.has(item.id))
+    .reduce((sum, item) => sum + (Number(item.totalHeight) || 0), 0);
+  elements.sectionMergeInfo.textContent = selectedCount
+    ? `已选择 ${selectedCount} 节，合计约 ${Math.round(totalHeight / 100) / 10}k px。合并编辑器适合第一次没截完整时使用；一次截完通常不用进入。`
+    : "请选择至少一节后再合并。";
+  elements.refreshSections.disabled = !captureId;
+  elements.openMergeEditor.disabled = selectedCount < 1;
+  elements.moveSectionUp.disabled = !activeSectionId || sectionMergeOrder.indexOf(activeSectionId) <= 0;
+  elements.moveSectionDown.disabled = !activeSectionId || sectionMergeOrder.indexOf(activeSectionId) < 0 || sectionMergeOrder.indexOf(activeSectionId) >= sectionMergeOrder.length - 1;
+}
+
+function renderSectionItem(item) {
+  const node = document.createElement("article");
+  node.className = `section-item${item.id === activeSectionId ? " is-active" : ""}`;
+  node.dataset.sectionId = item.id;
+
+  const row = document.createElement("label");
+  row.className = "section-row";
+
+  const checkbox = document.createElement("input");
+  checkbox.type = "checkbox";
+  checkbox.dataset.sectionId = item.id;
+  checkbox.checked = selectedSectionIds.has(item.id);
+
+  const body = document.createElement("div");
+  const title = document.createElement("p");
+  title.className = "section-title";
+  title.textContent = `${item.id === captureId ? "当前 · " : ""}${item.title || "未命名截图"}`;
+
+  const meta = document.createElement("p");
+  meta.className = "section-meta";
+  meta.textContent = [
+    item.segment?.part ? `第 ${item.segment.part} 节` : "独立截图",
+    formatDateTime(item.capturedAt),
+    `${item.sliceCount || 0} 张切片`,
+    `${Math.round((item.totalHeight || 0) / 100) / 10}k px`
+  ].filter(Boolean).join(" · ");
+
+  body.append(title, meta);
+  row.append(checkbox, body);
+  node.appendChild(row);
+  return node;
+}
+
+function getOrderedSectionItems() {
+  const byId = new Map(sectionMergeItems.map((item) => [item.id, item]));
+  const orderedIds = [
+    ...sectionMergeOrder,
+    ...sectionMergeItems.map((item) => item.id).filter((id) => !sectionMergeOrder.includes(id))
+  ];
+  return orderedIds.map((id) => byId.get(id)).filter(Boolean);
+}
+
+function moveActiveSection(direction) {
+  const index = sectionMergeOrder.indexOf(activeSectionId);
+  const nextIndex = index + direction;
+  if (index < 0 || nextIndex < 0 || nextIndex >= sectionMergeOrder.length) {
+    return;
+  }
+  const next = [...sectionMergeOrder];
+  [next[index], next[nextIndex]] = [next[nextIndex], next[index]];
+  sectionMergeOrder = next;
+  renderSectionManager();
 }
 
 function renderCaptureCacheList(items) {
@@ -632,6 +978,8 @@ function renderCaptureCacheList(items) {
     meta.textContent = [
       item.id === captureId ? "当前" : "",
       formatDateTime(item.capturedAt),
+      item.segment?.part ? `第 ${item.segment.part} 段` : "",
+      hasSegmentResumePosition(item.segment) ? "可返回原文位置" : "",
       `${item.sliceCount || 0} 张切片`,
       `${Math.round((item.totalHeight || 0) / 100) / 10}k px`
     ].filter(Boolean).join(" · ");
@@ -667,6 +1015,23 @@ function updateCacheControls(items = null) {
   elements.cacheInfo.textContent = hasDeletedCaptureCache
     ? "本次截图缓存已删除；当前页面未刷新前仍可继续导出。"
     : "关闭结果页后，本次截图缓存仍会暂存在浏览器本机，可在这里查看或删除。";
+}
+
+function openCaptureResult(targetCaptureId) {
+  window.open(chrome.runtime.getURL(`result/result.html?id=${encodeURIComponent(targetCaptureId)}`), "_blank", "noopener");
+}
+
+function openMergeEditor() {
+  const ids = sectionMergeOrder.filter((id) => selectedSectionIds.has(id));
+  if (!ids.length) {
+    setStatus("请先选择要进入合并编辑器的截图节。", true);
+    return;
+  }
+
+  const params = new URLSearchParams();
+  params.set("ids", ids.join(","));
+  params.set("from", captureId);
+  location.href = chrome.runtime.getURL(`result/merge.html?${params.toString()}`);
 }
 
 async function deleteCurrentCaptureCache() {
@@ -776,15 +1141,33 @@ async function composePreview() {
 }
 
 async function fetchSlice(index) {
+  return fetchCaptureSlice(captureId, index);
+}
+
+async function fetchCaptureSlice(targetCaptureId, index) {
   const response = await chrome.runtime.sendMessage({
     type: "GET_CAPTURE_SLICE",
-    captureId,
+    captureId: targetCaptureId,
     index
   });
   if (!response?.ok) {
     throw new Error(response?.error || `Could not load slice ${index + 1}.`);
   }
   return response.slice;
+}
+
+async function fetchCaptureMeta(targetCaptureId) {
+  if (targetCaptureId === captureId && capture) {
+    return capture;
+  }
+  const response = await chrome.runtime.sendMessage({
+    type: "GET_CAPTURE_META",
+    captureId: targetCaptureId
+  });
+  if (!response?.ok) {
+    throw new Error(response?.error || "Could not load capture.");
+  }
+  return response.payload;
 }
 
 function stripSliceData(slice) {
@@ -806,7 +1189,7 @@ function formatCompositionSizeNote() {
   }
   const naturalMp = Math.round((compositionInfo.naturalWidth * compositionInfo.naturalHeight) / 1_000_000);
   const previewMp = Math.round((compositionInfo.width * compositionInfo.height) / 1_000_000);
-  return ` 超长页面已自动缩放到 ${Math.round(compositionInfo.downscale * 100)}% 预览（原始约 ${naturalMp}MP，当前约 ${previewMp}MP）；分页导出会使用原始切片。`;
+  return ` 超长页面已自动缩放到 ${Math.round(compositionInfo.downscale * 100)}% 预览（原始约 ${naturalMp}MP，当前约 ${previewMp}MP）；预览模糊属正常，分页导出会使用原始切片。`;
 }
 
 function assertCanvasSize(width, height) {
@@ -864,34 +1247,146 @@ async function buildPagedImageZip({ type, extension, quality, label }) {
 
 async function buildPdfBytes() {
   const exportState = getHighResExportState();
-  const sourceWidth = exportState.outputWidth;
   const pdf = new SimplePdf();
+  const cuts = getHighResExportPageCuts(exportState);
+
+  for (let i = 0; i < cuts.length - 1; i += 1) {
+    const pageCanvas = await renderHighResCanvasSlice(exportState, cuts[i], cuts[i + 1]);
+    addCanvasPageToPdf(pdf, pageCanvas, exportState.outputWidth, elements.includeMeta.checked ? footerText(i + 1, cuts.length - 1) : "");
+  }
+
+  return pdf.build();
+}
+
+async function exportMergedSectionsPdf() {
+  const ids = sectionMergeOrder.filter((id) => selectedSectionIds.has(id));
+  if (!ids.length) {
+    setStatus("请先选择要合并的截图节。", true);
+    return;
+  }
+
+  const mergeMode = "draft";
+  setBusy(true, "正在准备分节合并 PDF...");
+  try {
+    const pdfBytes = await buildMergedSectionsPdfBytes(ids, { mergeMode });
+    downloadBlob(new Blob([pdfBytes], { type: "application/pdf" }), `${sectionMergeFilename()}-merged.pdf`);
+    setStatus("合并 PDF 已交给浏览器下载。");
+  } finally {
+    setBusy(false);
+  }
+}
+
+async function buildMergedSectionsPdfBytes(ids, options = {}) {
+  const sections = [];
+  let totalPages = 0;
+  const sharedState = options.mergeMode === "draft" ? null : buildCurrentEditorState();
+
+  for (let sectionIndex = 0; sectionIndex < ids.length; sectionIndex += 1) {
+    const sectionCapture = await fetchCaptureMeta(ids[sectionIndex]);
+    const editorState = options.mergeMode === "draft"
+      ? readSavedEditorStateForCapture(sectionCapture.id)
+      : sharedState;
+    const exportState = await getFullCaptureExportState(sectionCapture, editorState);
+    const cuts = getSectionExportPageCuts(exportState, editorState);
+    totalPages += cuts.length - 1;
+    sections.push({ sectionCapture, exportState, cuts, sectionIndex, hasEditorState: Boolean(editorState) });
+  }
+
+  const pdf = new SimplePdf();
+  let pageNumber = 0;
+  for (const section of sections) {
+    for (let i = 0; i < section.cuts.length - 1; i += 1) {
+      pageNumber += 1;
+      const pageCanvas = await renderHighResCanvasSlice(section.exportState, section.cuts[i], section.cuts[i + 1]);
+      const footer = elements.includeMeta.checked
+        ? `S${section.sectionIndex + 1}  ${pageNumber}/${totalPages}  ${formatDateTime(section.sectionCapture.capturedAt)}`
+        : "";
+      addCanvasPageToPdf(pdf, pageCanvas, section.exportState.outputWidth, footer);
+      const stateLabel = options.mergeMode === "draft" && !section.hasEditorState ? "，该节未找到草稿，使用完整范围" : "";
+      setStatus(`正在合并第 ${section.sectionIndex + 1}/${sections.length} 节，PDF 第 ${pageNumber}/${totalPages} 页${stateLabel}...`);
+    }
+  }
+
+  return pdf.build();
+}
+
+async function getFullCaptureExportState(sectionCapture, editorState = null) {
+  const firstSlice = await fetchCaptureSlice(sectionCapture.id, 0);
+  const first = stripSliceData(firstSlice);
+  const firstImage = await loadImage(firstSlice.dataUrl);
+  const naturalCanvasScale = firstImage.naturalWidth / first.viewport.width;
+  const targetWidth = sectionCapture.target?.visibleWidth || first.cropRect.width || first.viewport.width;
+  const targetHeight = sectionCapture.target?.totalHeight || first.targetVisibleHeight || first.cropRect.height;
+  const logicalCrop = getLogicalCropFromEditorState(editorState, targetWidth, targetHeight);
+  const outputScale = naturalCanvasScale * getEditorStateExportScale(editorState);
+  const outputWidth = Math.max(1, Math.round(logicalCrop.width * outputScale));
+  const outputHeight = Math.max(1, Math.round(logicalCrop.height * outputScale));
+  return {
+    capture: sectionCapture,
+    captureId: sectionCapture.id,
+    logicalCrop,
+    outputScale,
+    outputWidth,
+    outputHeight
+  };
+}
+
+function getLogicalCropFromEditorState(editorState, targetWidth, targetHeight) {
+  if (!editorState?.enableCrop || !editorState?.crop || !editorState?.canvas) {
+    return { x: 0, y: 0, width: targetWidth, height: targetHeight };
+  }
+
+  const canvasWidth = Number(editorState.canvas.width);
+  const canvasHeight = Number(editorState.canvas.height);
+  if (!Number.isFinite(canvasWidth) || !Number.isFinite(canvasHeight) || canvasWidth <= 0 || canvasHeight <= 0) {
+    return { x: 0, y: 0, width: targetWidth, height: targetHeight };
+  }
+
+  const cropX = clamp(Number(editorState.crop.x) || 0, 0, Math.max(0, canvasWidth - 1));
+  const cropY = clamp(Number(editorState.crop.y) || 0, 0, Math.max(0, canvasHeight - 1));
+  const cropWidth = clamp(Number(editorState.crop.width) || canvasWidth, 1, canvasWidth - cropX);
+  const cropHeight = clamp(Number(editorState.crop.height) || canvasHeight, 1, canvasHeight - cropY);
+  const x = clamp((cropX / canvasWidth) * targetWidth, 0, Math.max(0, targetWidth - 1));
+  const y = clamp((cropY / canvasHeight) * targetHeight, 0, Math.max(0, targetHeight - 1));
+  return {
+    x,
+    y,
+    width: clamp((cropWidth / canvasWidth) * targetWidth, 1, Math.max(1, targetWidth - x)),
+    height: clamp((cropHeight / canvasHeight) * targetHeight, 1, Math.max(1, targetHeight - y))
+  };
+}
+
+function getEditorStateExportScale(editorState) {
+  return clamp(Number(editorState?.exportScale) || getExportScale(), 0.5, 2);
+}
+
+function getSectionExportPageCuts(exportState, editorState) {
+  if (editorState?.customPagination && Array.isArray(editorState.manualCutFractions) && editorState.manualCutFractions.length > 0) {
+    return buildManualPageCutsFromFractions(exportState.outputHeight, editorState.manualCutFractions);
+  }
+  return buildRegularPageCuts(exportState.outputWidth, exportState.outputHeight);
+}
+
+function addCanvasPageToPdf(pdf, pageCanvas, sourceWidth, footer = "") {
   const pageSize = getPageSize();
   const margin = 24;
   const footerHeight = elements.includeMeta.checked ? 20 : 0;
   const imageWidthPt = pageSize.width - margin * 2;
   const imageHeightPt = pageSize.height - margin * 2 - footerHeight;
-  const cuts = getHighResExportPageCuts(exportState);
-
-  for (let i = 0; i < cuts.length - 1; i += 1) {
-    const pageCanvas = await renderHighResCanvasSlice(exportState, cuts[i], cuts[i + 1]);
-    const imageData = dataUrlToBytes(pageCanvas.toDataURL("image/jpeg", 0.92));
-    const drawnHeightPt = Math.min(imageHeightPt, imageWidthPt * (pageCanvas.height / sourceWidth));
-    pdf.addImagePage({
-      pageWidth: pageSize.width,
-      pageHeight: pageSize.height,
-      imageBytes: imageData,
-      imageWidth: pageCanvas.width,
-      imageHeight: pageCanvas.height,
-      x: margin,
-      y: pageSize.height - margin - drawnHeightPt,
-      width: imageWidthPt,
-      height: drawnHeightPt,
-      footer: elements.includeMeta.checked ? footerText(i + 1, cuts.length - 1) : ""
-    });
-  }
-
-  return pdf.build();
+  const imageData = dataUrlToBytes(pageCanvas.toDataURL("image/jpeg", 0.92));
+  const drawnHeightPt = Math.min(imageHeightPt, imageWidthPt * (pageCanvas.height / sourceWidth));
+  pdf.addImagePage({
+    pageWidth: pageSize.width,
+    pageHeight: pageSize.height,
+    imageBytes: imageData,
+    imageWidth: pageCanvas.width,
+    imageHeight: pageCanvas.height,
+    x: margin,
+    y: pageSize.height - margin - drawnHeightPt,
+    width: imageWidthPt,
+    height: drawnHeightPt,
+    footer
+  });
 }
 
 function getEditedCanvas() {
@@ -936,6 +1431,8 @@ function getHighResExportState() {
   const outputHeight = Math.max(1, Math.round(logicalCrop.height * outputScale));
 
   return {
+    capture,
+    captureId,
     previewCrop,
     logicalCrop,
     outputScale,
@@ -948,82 +1445,7 @@ function getHighResExportPageCuts(exportState) {
   if (elements.customPagination.checked && manualCutFractions.length > 0) {
     return getManualPageCuts(exportState.outputHeight);
   }
-  if (!elements.smartSplit.checked) {
-    return buildRegularPageCuts(exportState.outputWidth, exportState.outputHeight);
-  }
-  return buildSmartHighResPageCuts(exportState);
-}
-
-function buildSmartHighResPageCuts(exportState) {
-  const cuts = [0];
-  const pageHeightPx = getPageHeightPx(exportState.outputWidth);
-  const minPage = Math.max(320, Math.floor(pageHeightPx * 0.72));
-  let cursor = 0;
-
-  while (cursor + pageHeightPx < exportState.outputHeight) {
-    const target = cursor + pageHeightPx;
-    const split = findQuietHighResSplit(exportState, target, Math.floor(pageHeightPx * 0.14), minPage, cursor);
-    cursor = Math.min(Math.max(split, cursor + minPage), exportState.outputHeight);
-    cuts.push(cursor);
-  }
-
-  if (cuts.at(-1) !== exportState.outputHeight) {
-    cuts.push(exportState.outputHeight);
-  }
-
-  return cuts;
-}
-
-function findQuietHighResSplit(exportState, targetY, radius, minPageHeight, pageStart) {
-  const context = elements.canvas.getContext("2d", { willReadFrequently: true });
-  const crop = exportState.previewCrop;
-  const cropX = Math.round(crop.x);
-  const cropWidth = Math.max(1, Math.min(Math.round(crop.width), elements.canvas.width - cropX));
-  const startOutput = Math.max(pageStart + minPageHeight, targetY - radius);
-  const endOutput = Math.min(exportState.outputHeight - 1, targetY + radius);
-  const startPreview = clamp(Math.round(outputYToPreviewY(exportState, startOutput)), Math.round(crop.y), Math.round(crop.y + crop.height - 1));
-  const endPreview = clamp(Math.round(outputYToPreviewY(exportState, endOutput)), startPreview, Math.round(crop.y + crop.height - 1));
-  const sampleStepX = Math.max(4, Math.floor(cropWidth / 180));
-  const band = Math.max(2, Math.min(6, Math.floor(crop.height)));
-  let bestY = targetY;
-  let bestScore = Number.POSITIVE_INFINITY;
-
-  for (let previewY = startPreview; previewY <= endPreview; previewY += 3) {
-    const imageData = context.getImageData(cropX, previewY, cropWidth, Math.min(band, elements.canvas.height - previewY)).data;
-    let score = 0;
-    let count = 0;
-
-    for (let row = 0; row < band && previewY + row < elements.canvas.height; row += 1) {
-      let previous = null;
-      for (let x = 0; x < cropWidth; x += sampleStepX) {
-        const offset = (row * cropWidth + x) * 4;
-        const luminance = imageData[offset] * 0.2126 + imageData[offset + 1] * 0.7152 + imageData[offset + 2] * 0.0722;
-        if (previous !== null) {
-          score += Math.abs(luminance - previous);
-        }
-        previous = luminance;
-        count += 1;
-      }
-    }
-
-    const outputY = previewYToOutputY(exportState, previewY);
-    const distancePenalty = Math.abs(outputY - targetY) * 0.08;
-    const normalized = score / Math.max(count, 1) + distancePenalty;
-    if (normalized < bestScore) {
-      bestScore = normalized;
-      bestY = outputY;
-    }
-  }
-
-  return Math.round(bestY);
-}
-
-function outputYToPreviewY(exportState, outputY) {
-  return exportState.previewCrop.y + (outputY / Math.max(1, exportState.outputHeight)) * exportState.previewCrop.height;
-}
-
-function previewYToOutputY(exportState, previewY) {
-  return ((previewY - exportState.previewCrop.y) / Math.max(1, exportState.previewCrop.height)) * exportState.outputHeight;
+  return buildRegularPageCuts(exportState.outputWidth, exportState.outputHeight);
 }
 
 async function renderHighResCanvasSlice(exportState, startY, endY) {
@@ -1059,12 +1481,14 @@ async function renderHighResPagedImagePage(exportState, startY, endY, page, tota
 }
 
 async function drawHighResContent(context, exportState, startY, endY, offsetY) {
+  const sourceCapture = exportState.capture || capture;
+  const sourceCaptureId = exportState.captureId || captureId;
   const pageLogicalTop = exportState.logicalCrop.y + startY / exportState.outputScale;
   const pageLogicalBottom = exportState.logicalCrop.y + endY / exportState.outputScale;
   const cropLogicalBottom = exportState.logicalCrop.y + exportState.logicalCrop.height;
 
-  for (let index = 0; index < capture.slices.length; index += 1) {
-    const slice = capture.slices[index];
+  for (let index = 0; index < sourceCapture.slices.length; index += 1) {
+    const slice = sourceCapture.slices[index];
     const sliceLogicalHeight = Math.min(slice.cropRect.height, slice.targetVisibleHeight);
     const sliceTop = slice.scrollTop;
     const sliceBottom = sliceTop + sliceLogicalHeight;
@@ -1074,7 +1498,7 @@ async function drawHighResContent(context, exportState, startY, endY, offsetY) {
       continue;
     }
 
-    const sliceWithData = await fetchSlice(index);
+    const sliceWithData = await fetchCaptureSlice(sourceCaptureId, index);
     const image = await loadImage(sliceWithData.dataUrl);
     const scaleX = image.naturalWidth / slice.viewport.width;
     const scaleY = image.naturalHeight / slice.viewport.height;
@@ -1177,7 +1601,15 @@ function getExportPageCuts(sourceCanvas) {
 }
 
 function getManualPageCuts(height) {
-  const innerCuts = normalizeManualCutFractions()
+  return buildManualPageCutsFromFractions(height, normalizeManualCutFractions());
+}
+
+function buildManualPageCutsFromFractions(height, fractions) {
+  const innerCuts = [...new Set((fractions || [])
+    .map(Number)
+    .filter(Number.isFinite)
+    .map((fraction) => clamp(fraction, 0.001, 0.999)))]
+    .sort((a, b) => a - b)
     .map((fraction) => clamp(Math.round(fraction * height), 1, Math.max(1, height - 1)));
   const cuts = [0];
   for (const cut of innerCuts) {
@@ -1206,14 +1638,9 @@ function buildRegularPageCuts(width, height) {
 function buildPageCuts(canvas, pageHeightPx) {
   const cuts = [0];
   let cursor = 0;
-  const minPage = Math.max(320, Math.floor(pageHeightPx * 0.72));
 
   while (cursor + pageHeightPx < canvas.height) {
-    const target = cursor + pageHeightPx;
-    const split = elements.smartSplit.checked
-      ? findQuietSplit(canvas, target, Math.floor(pageHeightPx * 0.14), minPage, cursor)
-      : target;
-    cursor = Math.min(Math.max(split, cursor + minPage), canvas.height);
+    cursor = Math.min(cursor + pageHeightPx, canvas.height);
     cuts.push(cursor);
   }
 
@@ -1222,44 +1649,6 @@ function buildPageCuts(canvas, pageHeightPx) {
   }
 
   return cuts;
-}
-
-function findQuietSplit(canvas, targetY, radius, minPageHeight, pageStart) {
-  const context = canvas.getContext("2d", { willReadFrequently: true });
-  const start = Math.max(pageStart + minPageHeight, targetY - radius);
-  const end = Math.min(canvas.height - 1, targetY + radius);
-  const sampleStepX = Math.max(4, Math.floor(canvas.width / 180));
-  const band = 6;
-  let bestY = targetY;
-  let bestScore = Number.POSITIVE_INFINITY;
-
-  for (let y = start; y <= end; y += 3) {
-    const imageData = context.getImageData(0, y, canvas.width, Math.min(band, canvas.height - y)).data;
-    let score = 0;
-    let count = 0;
-
-    for (let row = 0; row < band && y + row < canvas.height; row += 1) {
-      let previous = null;
-      for (let x = 0; x < canvas.width; x += sampleStepX) {
-        const offset = (row * canvas.width + x) * 4;
-        const luminance = imageData[offset] * 0.2126 + imageData[offset + 1] * 0.7152 + imageData[offset + 2] * 0.0722;
-        if (previous !== null) {
-          score += Math.abs(luminance - previous);
-        }
-        previous = luminance;
-        count += 1;
-      }
-    }
-
-    const distancePenalty = Math.abs(y - targetY) * 0.08;
-    const normalized = score / Math.max(count, 1) + distancePenalty;
-    if (normalized < bestScore) {
-      bestScore = normalized;
-      bestY = y;
-    }
-  }
-
-  return bestY;
 }
 
 function seedManualCutsFromAutomatic() {
@@ -1804,7 +2193,7 @@ function startCropDrag(event) {
     startPoint: point,
     startRect: action === "new" ? { ...point, width: 1, height: 1 } : currentCrop
   };
-  elements.canvasStage.setPointerCapture(event.pointerId);
+  setPointerCaptureSafe(elements.canvasStage, event.pointerId);
   event.preventDefault();
 
   if (action === "new") {
@@ -1828,9 +2217,7 @@ function finishCropDrag(event) {
   if (!cropDrag) {
     return;
   }
-  if (elements.canvasStage.hasPointerCapture(event.pointerId)) {
-    elements.canvasStage.releasePointerCapture(event.pointerId);
-  }
+  releasePointerCaptureSafe(elements.canvasStage, event.pointerId);
   if (cropDrag.action === "new" && !cropDrag.moved) {
     resetCropToFull();
   }
@@ -1919,7 +2306,7 @@ function startPageCutDrag(event) {
   };
   selectedPageCutIndex = pageCutDrag.index;
   updatePageGuides();
-  elements.canvasStage.setPointerCapture(event.pointerId);
+  setPointerCaptureSafe(elements.canvasStage, event.pointerId);
   event.preventDefault();
   event.stopPropagation();
 }
@@ -1947,9 +2334,7 @@ function finishPageCutDrag(event) {
     return;
   }
 
-  if (elements.canvasStage.hasPointerCapture(event.pointerId)) {
-    elements.canvasStage.releasePointerCapture(event.pointerId);
-  }
+  releasePointerCaptureSafe(elements.canvasStage, event.pointerId);
   pageCutDrag = null;
   normalizeManualCutFractions();
   updatePageGuides();
@@ -2063,6 +2448,18 @@ function baseFilename() {
     .slice(0, 80);
   const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
   return `${safeTitle || "full-page-capture"}-${stamp}`;
+}
+
+function sectionMergeFilename() {
+  const title = capture?.source?.title || "full-page-capture";
+  const safeTitle = title
+    .replace(/[\u200B-\u200F\u202A-\u202E\u2060-\u206F\uFEFF]/g, "")
+    .replace(/[\\/:*?"<>|]+/g, "-")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, 72);
+  const stamp = new Date().toISOString().replace(/[:.]/g, "-").slice(0, 19);
+  return `${safeTitle || "full-page-capture"}-sections-${stamp}`;
 }
 
 function zipPageRootName() {
@@ -2223,8 +2620,20 @@ function setExportControlsEnabled(enabled) {
   for (const button of [elements.savePng, elements.savePagedPng, elements.saveJpeg, elements.savePagedJpeg, elements.savePdf, elements.cropFull, elements.cropVisible]) {
     button.disabled = !enabled;
   }
+  for (const button of [elements.refreshSections, elements.openMergeEditor, elements.moveSectionUp, elements.moveSectionDown]) {
+    if (button) {
+      button.disabled = !enabled;
+    }
+  }
+  if (elements.openSourceAtEnd) {
+    elements.openSourceAtEnd.disabled = !enabled || !hasSegmentResumePosition(capture?.segment);
+  }
+  if (elements.startSourceAtEnd) {
+    elements.startSourceAtEnd.disabled = !enabled || !hasSegmentResumePosition(capture?.segment);
+  }
   if (enabled) {
     updatePaginationControls();
+    renderSectionManager();
   } else {
     for (const button of [elements.seedPageCuts, elements.addPageCut, elements.deletePageCut, elements.clearPageCuts]) {
       button.disabled = true;
@@ -2240,6 +2649,28 @@ function setStatus(message, isError = false) {
 function reportHandledError(error) {
   if (console.debug) {
     console.debug("Handled XF FullPage Capture error:", error);
+  }
+}
+
+function setPointerCaptureSafe(element, pointerId) {
+  try {
+    element.setPointerCapture(pointerId);
+  } catch (error) {
+    if (error?.name !== "InvalidStateError") {
+      throw error;
+    }
+  }
+}
+
+function releasePointerCaptureSafe(element, pointerId) {
+  try {
+    if (element.hasPointerCapture(pointerId)) {
+      element.releasePointerCapture(pointerId);
+    }
+  } catch (error) {
+    if (error?.name !== "InvalidStateError") {
+      throw error;
+    }
   }
 }
 

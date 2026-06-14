@@ -164,6 +164,29 @@ input[type="range"] {
   line-height: 1.2;
 }
 
+.segment-actions {
+  display: grid;
+  gap: 8px;
+}
+
+#openSourceAtEnd,
+#startSourceAtEnd {
+  width: 100%;
+}
+
+#openMergeEditor {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+  white-space: nowrap;
+}
+
+#openMergeEditor:not(:disabled):hover {
+  border-color: var(--accent-strong);
+  background: var(--accent-strong);
+  color: #fff;
+}
+
 label {
   color: var(--muted);
   font-weight: 700;
@@ -200,6 +223,10 @@ label {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 8px;
+}
+
+.wide-action {
+  width: 100%;
 }
 
 .hint-text {
@@ -245,6 +272,51 @@ label {
 .cache-list {
   display: grid;
   gap: 8px;
+}
+
+.section-list {
+  display: grid;
+  gap: 8px;
+  max-height: 260px;
+  overflow-y: auto;
+  padding-right: 2px;
+}
+
+.section-item {
+  display: grid;
+  gap: 6px;
+  padding: 9px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: #fff;
+}
+
+.section-item.is-active {
+  border-color: var(--accent);
+  box-shadow: 0 0 0 2px rgba(15, 118, 110, 0.12);
+}
+
+.section-row {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 8px;
+  align-items: start;
+}
+
+.section-title {
+  margin: 0;
+  color: var(--text);
+  font-size: 12px;
+  font-weight: 800;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.section-meta {
+  margin: 0;
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.35;
 }
 
 .cache-item {
@@ -503,14 +575,14 @@ canvas {
   position: absolute;
   z-index: 1;
   min-height: 10px;
-  border: 1px dashed rgba(15, 118, 110, 0.62);
+  border: 2px dashed rgba(15, 118, 110, 0.66);
   border-radius: 6px;
   background: rgba(20, 184, 166, 0.08);
   pointer-events: none;
 }
 
 .page-guide-safe-band.is-warning {
-  border-color: rgba(217, 119, 6, 0.68);
+  border-color: rgba(217, 119, 6, 0.72);
   background: rgba(245, 158, 11, 0.12);
 }
 

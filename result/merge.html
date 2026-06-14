@@ -1,0 +1,182 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>XF FullPage Capture Merge Editor</title>
+    <link rel="stylesheet" href="./merge.css">
+  </head>
+  <body>
+    <header class="app-bar">
+      <div>
+        <p class="eyebrow">XF FullPage Capture Sections</p>
+        <h1>分节合并编辑器</h1>
+        <p id="meta" class="meta">正在读取分节截图...</p>
+      </div>
+      <div class="actions">
+        <button id="exportPagedPng" type="button" disabled>分页 PNG</button>
+        <button id="exportPagedJpeg" type="button" disabled>分页 JPEG</button>
+        <button id="backToResult" type="button">返回结果页</button>
+        <button id="exportPdf" type="button" disabled>合并 PDF</button>
+      </div>
+    </header>
+
+    <main class="merge-workspace">
+      <aside class="panel">
+        <section class="panel-section">
+          <h2>全局导出</h2>
+          <p class="hint-text warning-text">合并编辑器主要用于同一篇文章分多节截取后的统一分页和导出。一次性截完时，直接在结果页导出即可，通常不用进入这里。</p>
+          <label>
+            纸张
+            <select id="paper">
+              <option value="a4">A4</option>
+              <option value="a3">A3</option>
+              <option value="a5">A5</option>
+              <option value="b5">B5</option>
+              <option value="letter">Letter</option>
+              <option value="legal">Legal</option>
+              <option value="tabloid">Tabloid</option>
+            </select>
+          </label>
+          <label>
+            方向
+            <select id="orientation">
+              <option value="portrait">竖版</option>
+              <option value="landscape">横版</option>
+            </select>
+          </label>
+          <label class="check-row">
+            <input id="includeMeta" type="checkbox" checked>
+            分页页脚显示页码和时间
+          </label>
+        </section>
+
+        <section class="panel-section">
+          <h2>视图</h2>
+          <p class="hint-text warning-text">如果截取画面过多，内容预览会比较慢，请耐心等待。分节合并编辑器处理多节长图时可能会短暂卡顿。</p>
+          <label>
+            预览缩放
+            <input id="previewZoom" type="range" min="0.15" max="1" step="0.05" value="0.5">
+            <span id="previewZoomValue" class="value-readout">50%</span>
+          </label>
+          <label>
+            布局
+            <select id="previewLayout">
+              <option value="double">双列对比</option>
+              <option value="single">单列浏览</option>
+              <option value="auto">自动排列</option>
+            </select>
+          </label>
+          <button id="fitWidth" class="wide-action" type="button" disabled>适配当前宽度</button>
+        </section>
+
+        <section class="panel-section">
+          <h2>分节</h2>
+          <label>
+            当前调整节
+            <select id="activeSection"></select>
+          </label>
+          <div class="mini-actions">
+            <button id="moveUp" type="button" disabled>上移</button>
+            <button id="moveDown" type="button" disabled>下移</button>
+          </div>
+          <button id="applyActiveToAll" class="wide-action" type="button" disabled>套用当前节参数到全部</button>
+          <div id="sectionList" class="section-list" aria-live="polite"></div>
+        </section>
+
+        <section class="panel-section">
+          <h2>选区和缩放</h2>
+          <label class="check-row">
+            <input id="enableCrop" type="checkbox">
+            使用选区导出
+          </label>
+          <div class="field-grid" aria-label="裁切区域">
+            <label>
+              X
+              <input id="cropX" type="number" min="0" step="1" value="0">
+            </label>
+            <label>
+              Y
+              <input id="cropY" type="number" min="0" step="1" value="0">
+            </label>
+            <label>
+              宽
+              <input id="cropWidth" type="number" min="1" step="1" value="1">
+            </label>
+            <label>
+              高
+              <input id="cropHeight" type="number" min="1" step="1" value="1">
+            </label>
+          </div>
+          <label>
+            导出缩放
+            <input id="exportScale" type="range" min="0.5" max="2" step="0.05" value="1">
+            <span id="exportScaleValue" class="value-readout">100%</span>
+          </label>
+          <div class="mini-actions">
+            <button id="cropFull" type="button" disabled>全图</button>
+            <button id="cropVisible" type="button" disabled>当前视图</button>
+          </div>
+        </section>
+
+        <section class="panel-section">
+          <h2>自定义分页</h2>
+          <label class="check-row">
+            <input id="customPagination" type="checkbox">
+            使用自定义分页线
+          </label>
+          <label>
+            页面范围
+            <select id="pageRangeMode">
+              <option value="all">显示全部 PDF 参考区</option>
+              <option value="selected">只看选中分页线</option>
+              <option value="off">隐藏页面范围</option>
+            </select>
+          </label>
+          <p id="pageRiskInfo" class="hint-text page-risk-info">开启自定义分页线后，预览里会显示 PDF 参考区。</p>
+          <div class="mini-actions">
+            <button id="seedPageCuts" type="button" disabled>按纸张生成</button>
+            <button id="addPageCut" type="button" aria-keyshortcuts="A + =" disabled>新增分页线</button>
+          </div>
+          <div class="mini-actions">
+            <button id="deletePageCut" type="button" aria-keyshortcuts="Delete Backspace" disabled>删除选中线</button>
+            <button id="clearPageCuts" type="button" disabled>清除分页线</button>
+          </div>
+          <p class="hint-text shortcut-hint">快捷键：A / + 在当前可见区域新增分页线；选中分页线后按 Delete / Backspace 删除。</p>
+          <p id="pageCutList" class="hint-text">自动分页。</p>
+        </section>
+
+        <section class="panel-section">
+          <h2>缓存</h2>
+          <p id="cacheUsage" class="hint-text">正在读取缓存大小...</p>
+          <label class="check-row">
+            <input id="autoClearAfterExport" type="checkbox">
+            导出后自动清理本次分节缓存
+          </label>
+          <div class="mini-actions">
+            <button id="refreshCacheUsage" type="button" disabled>刷新大小</button>
+            <button id="deleteSelectedCaches" type="button" disabled>清理本次分节</button>
+          </div>
+        </section>
+
+        <p id="status" class="status">初始化中...</p>
+      </aside>
+
+      <section class="preview-area" aria-label="Section previews">
+        <div id="sectionGrid" class="section-grid"></div>
+      </section>
+    </main>
+
+    <div id="loadingOverlay" class="loading-overlay" role="status" aria-live="polite">
+      <div class="loading-card">
+        <div class="loading-spinner" aria-hidden="true"></div>
+        <div>
+          <p id="loadingTitle" class="loading-title">正在加载分节截图...</p>
+          <p id="loadingDetail" class="loading-detail">长图预览需要读取多张切片，请稍等，不影响最终导出清晰度。</p>
+        </div>
+      </div>
+    </div>
+
+    <script src="./merge.js"></script>
+  </body>
+</html>
