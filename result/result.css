@@ -416,6 +416,7 @@ canvas {
 
 .crop-overlay {
   position: absolute;
+  z-index: 4;
   border: 2px solid var(--accent);
   background: rgba(15, 118, 110, 0.12);
   box-shadow: 0 0 0 9999px rgba(15, 23, 42, 0.24);
@@ -546,6 +547,7 @@ canvas {
 
 .page-guide-overlay {
   position: absolute;
+  z-index: 8;
   inset: 0;
   pointer-events: none;
 }
@@ -619,8 +621,42 @@ canvas {
 }
 
 .page-guide.is-custom {
-  border-top-style: solid;
-  cursor: ns-resize;
+  z-index: 5;
+  height: 24px;
+  transform: translateY(-12px);
+  border-top: 0;
+  cursor: grab;
+  touch-action: none;
+}
+
+.page-guide.is-custom::before {
+  top: 50%;
+  left: 0;
+  right: 0;
+  width: auto;
+  height: 5px;
+  transform: translateY(-50%);
+  border: 0;
+  border-radius: 999px;
+  background: #2563eb;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.94), 0 1px 7px rgba(15, 23, 42, 0.28);
+}
+
+.page-guide.is-custom:hover::before {
+  height: 7px;
+  background: #1d4ed8;
+}
+
+.page-guide.is-custom:active {
+  cursor: grabbing;
+}
+
+.page-guide.is-custom .page-guide-label {
+  top: 50%;
+  right: 8px;
+  left: auto;
+  transform: translateY(-50%);
+  padding: 2px 6px;
 }
 
 .page-guide.is-selected {
@@ -633,8 +669,19 @@ canvas {
   transform: scale(1.25);
 }
 
+.page-guide.is-custom.is-selected::before {
+  height: 7px;
+  transform: translateY(-50%);
+  background: #0f766e;
+  box-shadow: 0 0 0 2px rgba(255, 255, 255, 0.96), 0 0 0 5px rgba(15, 118, 110, 0.24), 0 2px 9px rgba(15, 23, 42, 0.28);
+}
+
 .page-guide.is-selected .page-guide-label {
   background: rgba(37, 99, 235, 0.96);
+}
+
+.page-guide.is-custom.is-selected .page-guide-label {
+  background: #0f766e;
 }
 
 .page-guide.is-risk {

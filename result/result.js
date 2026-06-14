@@ -90,6 +90,8 @@ const MAX_CANVAS_SIDE = 65535;
 const PDF_PAGE_SAFE_MIN_RATIO = 0.92;
 const PDF_PAGE_SAFE_MAX_RATIO = 1.08;
 const PDF_RISK_MESSAGE_LIMIT = 2;
+const PAGE_GUIDE_HIT_RADIUS_PX = 16;
+const PAGE_GUIDE_SIDE_HIT_PADDING_PX = 18;
 const PAGE_SESSION_ID = crypto.randomUUID();
 const LOAD_DIAGNOSTICS = readLoadDiagnostics();
 
@@ -2179,6 +2181,12 @@ function startCropDrag(event) {
     return;
   }
 
+  const nearbyPageCutIndex = getPageCutIndexNearPointer(event);
+  if (nearbyPageCutIndex >= 0) {
+    beginPageCutDrag(event, nearbyPageCutIndex);
+    return;
+  }
+
   let action = cropActionFromEvent(event);
   const point = canvasPointFromEvent(event);
   const currentCrop = getActiveCropRect();
@@ -2301,14 +2309,62 @@ function startPageCutDrag(event) {
     return;
   }
 
+  beginPageCutDrag(event, Number(guide.dataset.cutIndex));
+}
+
+function beginPageCutDrag(event, index) {
+  if (
+    !Number.isInteger(index)
+    || index < 0
+    || index >= manualCutFractions.length
+    || !elements.customPagination.checked
+  ) {
+    return;
+  }
+
   pageCutDrag = {
-    index: Number(guide.dataset.cutIndex)
+    index
   };
-  selectedPageCutIndex = pageCutDrag.index;
+  selectedPageCutIndex = index;
   updatePageGuides();
   setPointerCaptureSafe(elements.canvasStage, event.pointerId);
   event.preventDefault();
   event.stopPropagation();
+}
+
+function getPageCutIndexNearPointer(event) {
+  if (!elements.customPagination.checked || manualCutFractions.length === 0 || elements.canvas.width <= 0) {
+    return -1;
+  }
+
+  const canvasRect = elements.canvas.getBoundingClientRect();
+  if (canvasRect.width <= 0 || canvasRect.height <= 0) {
+    return -1;
+  }
+
+  const crop = getActiveCropRect();
+  const displayScale = canvasRect.width / Math.max(1, elements.canvas.width);
+  const left = canvasRect.left + crop.x * displayScale;
+  const right = canvasRect.left + (crop.x + crop.width) * displayScale;
+  if (
+    event.clientX < left - PAGE_GUIDE_SIDE_HIT_PADDING_PX
+    || event.clientX > right + PAGE_GUIDE_SIDE_HIT_PADDING_PX
+  ) {
+    return -1;
+  }
+
+  let nearestIndex = -1;
+  let nearestDistance = Infinity;
+  manualCutFractions.forEach((fraction, index) => {
+    const lineY = canvasRect.top + (crop.y + crop.height * fraction) * displayScale;
+    const distance = Math.abs(event.clientY - lineY);
+    if (distance <= PAGE_GUIDE_HIT_RADIUS_PX && distance < nearestDistance) {
+      nearestIndex = index;
+      nearestDistance = distance;
+    }
+  });
+
+  return nearestIndex;
 }
 
 function updatePageCutDrag(event) {
