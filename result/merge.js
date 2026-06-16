@@ -673,6 +673,12 @@ function updateScaleReadout() {
 
 function renderPageCutInfo(section) {
   if (!section.state.customPagination || section.state.manualCutFractions.length === 0) {
+    if (isSectionPageCapture(section)) {
+      const pageCount = Math.max(1, getSectionPageCaptureCutFractions(section).length + 1);
+      elements.pageCutList.textContent = `PPT 按截图页边界自动分页：${pageCount} 页。`;
+      updatePageRiskInfo(createSectionPageCaptureAnalysis());
+      return;
+    }
     elements.pageCutList.textContent = "自动分页。";
     updatePageRiskInfo(null);
     return;
@@ -684,8 +690,13 @@ function renderPageCutInfo(section) {
     : "";
   const exportState = getSectionExportState(section);
   const cuts = [0, ...section.state.manualCutFractions, 1];
-  const analysis = analyzeSectionPageRanges(section, cuts, exportState);
-  elements.pageCutList.textContent = `${fractions.length} 条：${fractions.join(" / ")}${selected}`;
+  const isPageCapture = isSectionPageCapture(section);
+  const analysis = isPageCapture
+    ? createSectionPageCaptureAnalysis(cuts)
+    : analyzeSectionPageRanges(section, cuts, exportState);
+  elements.pageCutList.textContent = isPageCapture
+    ? `按截图页边界：${Math.max(1, cuts.length - 1)} 页${selected}`
+    : `${fractions.length} 条：${fractions.join(" / ")}${selected}`;
   updatePageRiskInfo(analysis);
 }
 
@@ -793,6 +804,9 @@ function copyStateBetweenSections(source, target) {
   const yRatio = sourceCrop.y / source.canvas.height;
   const widthRatio = sourceCrop.width / source.canvas.width;
   const heightRatio = sourceCrop.height / source.canvas.height;
+  const targetManualCuts = sourceState.customPagination && isSectionPageCapture(target)
+    ? getSectionPageCaptureCutFractions(target)
+    : [...sourceState.manualCutFractions];
   return {
     enableCrop: sourceState.enableCrop,
     crop: normalizePreviewCrop(target, {
@@ -804,7 +818,7 @@ function copyStateBetweenSections(source, target) {
     exportScale: sourceState.exportScale,
     customPagination: sourceState.customPagination,
     manualCutMode: sourceState.manualCutMode === "auto" ? "auto" : "manual",
-    manualCutFractions: [...sourceState.manualCutFractions],
+    manualCutFractions: targetManualCuts,
     selectedPageCutIndex: -1
   };
 }
@@ -837,7 +851,10 @@ function updateSectionPageOverlay(section) {
   normalizeManualCutFractions(section);
   const cuts = [0, ...section.state.manualCutFractions, 1];
   const exportState = getSectionExportState(section);
-  const analysis = analyzeSectionPageRanges(section, cuts, exportState);
+  const isPageCapture = isSectionPageCapture(section);
+  const analysis = isPageCapture
+    ? createSectionPageCaptureAnalysis(cuts)
+    : analyzeSectionPageRanges(section, cuts, exportState);
   const pageRangeMode = elements.pageRangeMode.value || "all";
 
   if (pageRangeMode !== "off") {
@@ -852,44 +869,50 @@ function updateSectionPageOverlay(section) {
       const end = cuts[index + 1];
       const page = analysis.pages[index];
       const zone = document.createElement("div");
-      zone.className = `page-zone${page?.warning?.type === "too-short" ? " is-short" : ""}${page?.warning?.type === "too-tall" ? " is-tall" : ""}`;
+      zone.className = isPageCapture
+        ? "page-zone is-page-capture"
+        : `page-zone${page?.warning?.type === "too-short" ? " is-short" : ""}${page?.warning?.type === "too-tall" ? " is-tall" : ""}`;
       zone.style.top = `${Math.round(start * section.canvas.height)}px`;
       zone.style.height = `${Math.max(1, Math.round((end - start) * section.canvas.height))}px`;
 
       const label = document.createElement("span");
       label.className = "page-zone-label";
-      label.textContent = pageZoneLabel(index + 1, page?.ratio || 1);
+      label.textContent = isPageCapture ? `PPT 第 ${index + 1} 页` : pageZoneLabel(index + 1, page?.ratio || 1);
       zone.appendChild(label);
       section.pageOverlay.appendChild(zone);
     }
 
-    for (const band of analysis.bands) {
-      if (pageRangeMode === "selected"
-        && section.state.selectedPageCutIndex >= 0
-        && band.cutIndex !== section.state.selectedPageCutIndex) {
-        continue;
-      }
-      const bandElement = document.createElement("div");
-      bandElement.className = `page-safe-band${band.isWarning ? " is-warning" : ""}`;
-      bandElement.style.top = `${Math.round(band.start * section.canvas.height)}px`;
-      bandElement.style.height = `${Math.max(10, Math.round((band.end - band.start) * section.canvas.height))}px`;
+    if (!isPageCapture) {
+      for (const band of analysis.bands) {
+        if (pageRangeMode === "selected"
+          && section.state.selectedPageCutIndex >= 0
+          && band.cutIndex !== section.state.selectedPageCutIndex) {
+          continue;
+        }
+        const bandElement = document.createElement("div");
+        bandElement.className = `page-safe-band${band.isWarning ? " is-warning" : ""}`;
+        bandElement.style.top = `${Math.round(band.start * section.canvas.height)}px`;
+        bandElement.style.height = `${Math.max(10, Math.round((band.end - band.start) * section.canvas.height))}px`;
 
-      const label = document.createElement("span");
-      label.className = "page-safe-label";
-      label.textContent = "PDF参考区";
-      bandElement.appendChild(label);
-      section.pageOverlay.appendChild(bandElement);
+        const label = document.createElement("span");
+        label.className = "page-safe-label";
+        label.textContent = "PDF参考区";
+        bandElement.appendChild(label);
+        section.pageOverlay.appendChild(bandElement);
+      }
     }
   }
 
   section.state.manualCutFractions.forEach((fraction, index) => {
-    const lineRisk = analysis.lineWarnings[index] || null;
+    const lineRisk = isPageCapture ? null : analysis.lineWarnings[index] || null;
     const line = document.createElement("div");
-    line.className = `page-line${index === section.state.selectedPageCutIndex ? " is-active" : ""}`;
+    line.className = `page-line${index === section.state.selectedPageCutIndex ? " is-active" : ""}${isPageCapture ? " is-page-capture" : ""}`;
     if (lineRisk) {
       line.classList.add("is-risk", `is-${lineRisk.type}`);
     }
-    line.dataset.label = lineRisk ? `自定义 P${index + 1} · ${lineRisk.label}` : `自定义 P${index + 1}`;
+    line.dataset.label = isPageCapture
+      ? `PPT P${index + 1}`
+      : lineRisk ? `自定义 P${index + 1} · ${lineRisk.label}` : `自定义 P${index + 1}`;
     line.style.top = `${Math.round(fraction * section.canvas.height)}px`;
     line.addEventListener("pointerdown", (event) => startPageCutDrag(event, section, index));
     section.pageOverlay.appendChild(line);
@@ -904,6 +927,16 @@ function pageZoneLabel(page, ratio) {
     return `第 ${page} 页 · 偏短，PDF 可能拉长/留白`;
   }
   return `第 ${page} 页 · 接近纸张范围`;
+}
+
+function createSectionPageCaptureAnalysis(cuts = [0, 1]) {
+  return {
+    pageCapture: true,
+    items: [],
+    bands: [],
+    lineWarnings: [],
+    pages: Array.from({ length: Math.max(1, cuts.length - 1) }, () => ({ ratio: 1, warning: null }))
+  };
 }
 
 function analyzeSectionPageRanges(section, cuts, exportState) {
@@ -970,6 +1003,11 @@ function analyzeSectionPageRanges(section, cuts, exportState) {
 
 function updatePageRiskInfo(analysis) {
   elements.pageRiskInfo.classList.remove("is-ok", "is-warning");
+  if (analysis?.pageCapture) {
+    elements.pageRiskInfo.classList.add("is-ok");
+    elements.pageRiskInfo.textContent = "PPT 已按截图页分页，不使用网页截图的 PDF 参考区。";
+    return;
+  }
   if (!analysis) {
     elements.pageRiskInfo.textContent = "开启自定义分页线后，预览里会显示 PDF 参考区。";
     return;
@@ -1174,9 +1212,59 @@ function capturePointer(event) {
 }
 
 function seedPageCutFractions(section) {
+  if (isSectionPageCapture(section)) {
+    const pageCutFractions = getSectionPageCaptureCutFractions(section);
+    if (pageCutFractions.length > 0) {
+      return pageCutFractions;
+    }
+  }
+
   const exportState = getSectionExportState(section);
   const cuts = buildRegularPageCuts(exportState.outputWidth, exportState.outputHeight);
   return cuts.slice(1, -1).map((cut) => cut / exportState.outputHeight);
+}
+
+function isSectionPageCapture(section) {
+  return section?.capture?.target?.captureStrategy === "pages"
+    || section?.capture?.target?.captureMode === "pages";
+}
+
+function getSectionPageCaptureCutFractions(section) {
+  const totalHeight = getSectionPageCaptureLogicalHeight(section);
+  const fractions = (section?.capture?.slices || [])
+    .slice(1)
+    .map((slice) => Number(slice.scrollTop) / totalHeight)
+    .filter((fraction) => Number.isFinite(fraction) && fraction > 0 && fraction < 1);
+  if (fractions.length > 0) {
+    return fractions;
+  }
+
+  const pageCount = Math.max(
+    0,
+    Number(section?.capture?.target?.pageCount) || (section?.capture?.slices || []).length
+  );
+  return Array.from({ length: Math.max(0, pageCount - 1) }, (_, index) => (index + 1) / pageCount);
+}
+
+function getSectionPageCaptureLogicalHeight(section) {
+  const targetTotalHeight = Number(section?.capture?.target?.totalHeight);
+  if (Number.isFinite(targetTotalHeight) && targetTotalHeight > 0) {
+    return targetTotalHeight;
+  }
+
+  const slices = section?.capture?.slices || [];
+  const lastSlice = slices.at(-1);
+  const lastSliceBottom = Number(lastSlice?.scrollTop)
+    + Number(lastSlice?.targetVisibleHeight || lastSlice?.cropRect?.height);
+  if (Number.isFinite(lastSliceBottom) && lastSliceBottom > 0) {
+    return lastSliceBottom;
+  }
+
+  const summedHeight = slices.reduce((sum, slice) => {
+    const sliceHeight = Number(slice.targetVisibleHeight || slice.cropRect?.height) || 0;
+    return sum + Math.max(0, sliceHeight);
+  }, 0);
+  return Math.max(1, summedHeight || slices.length);
 }
 
 function seedSectionPageCuts(section) {
@@ -1274,6 +1362,14 @@ function normalizeEditorState(section, savedState) {
       width: (Number(savedState.crop.width) || canvasWidth) / canvasWidth * section.canvas.width,
       height: (Number(savedState.crop.height) || canvasHeight) / canvasHeight * section.canvas.height
     });
+  }
+
+  if (isSectionPageCapture(section) && state.customPagination && state.manualCutFractions.length === 0) {
+    const pageCutFractions = getSectionPageCaptureCutFractions(section);
+    if (pageCutFractions.length > 0) {
+      state.manualCutMode = "auto";
+      state.manualCutFractions = pageCutFractions;
+    }
   }
 
   return state;
@@ -1435,6 +1531,12 @@ function getSectionExportState(section) {
 function getSectionPageCuts(section, exportState) {
   if (section.state.customPagination && section.state.manualCutFractions.length > 0) {
     return buildManualPageCutsFromFractions(exportState.outputHeight, section.state.manualCutFractions);
+  }
+  if (isSectionPageCapture(section)) {
+    const pageCutFractions = getSectionPageCaptureCutFractions(section);
+    if (pageCutFractions.length > 0) {
+      return buildManualPageCutsFromFractions(exportState.outputHeight, pageCutFractions);
+    }
   }
   return buildRegularPageCuts(exportState.outputWidth, exportState.outputHeight);
 }

@@ -5,7 +5,7 @@ let lastVisibleTabCaptureAt = 0;
 let visibleTabCaptureQueue = Promise.resolve();
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
-const CAPTURE_INTERVAL_MS = 900;
+const CAPTURE_INTERVAL_MS = 700;
 const CAPTURE_TAB_WAIT_MS = 220;
 const CAPTURE_QUOTA_RETRY_MS = 1250;
 const MAX_SLICES = 260;
@@ -128,8 +128,10 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 
 async function launchCaptureFromMessage(message) {
   const tab = await resolveCaptureTab(message.tabId);
+  const mode = normalizeCaptureMode(message.mode);
   return launchCapture(tab, {
-    mode: normalizeCaptureMode(message.mode)
+    mode,
+    captureProfile: normalizeCaptureProfile(message.captureProfile || (mode === "range" ? "default" : message.mode || "auto"))
   });
 }
 
@@ -142,6 +144,7 @@ async function startCaptureFromSourceScroll(captureId, resultTabId = null) {
   const { payload, tab, scrollTop } = await returnSourceToCaptureScroll(captureId);
   return launchCapture(tab, {
     mode: "immediate",
+    captureProfile: normalizeCaptureProfile(payload.target?.captureProfile),
     startScrollTop: scrollTop,
     segmentPart: (Number(payload.segment?.part) || 1) + 1,
     parentCaptureId: payload.id || captureId,
@@ -166,12 +169,16 @@ async function returnSourceToCaptureScroll(captureId) {
   const frameId = Number.isInteger(payload.target?.frameId) ? payload.target.frameId : 0;
   let response = await sendToFrame(tab.id, frameId, {
     type: "XF_SCROLL_TO_POSITION",
-    scrollTop
+    scrollTop,
+    captureProfile: normalizeCaptureProfile(payload.target?.captureProfile),
+    target: buildResumeTargetHint(payload)
   }).catch((error) => ({ ok: false, error: error.message || String(error) }));
   if (!response?.ok && frameId !== 0) {
     response = await sendToFrame(tab.id, 0, {
       type: "XF_SCROLL_TO_POSITION",
-      scrollTop
+      scrollTop,
+      captureProfile: normalizeCaptureProfile(payload.target?.captureProfile),
+      target: buildResumeTargetHint(payload)
     }).catch((error) => ({ ok: false, error: error.message || String(error) }));
   }
   if (!response?.ok) {
@@ -185,16 +192,26 @@ async function returnSourceToCaptureScroll(captureId) {
 }
 
 function getResumeScrollTop(payload) {
-  const next = Number(payload.segment?.nextScrollTop);
-  if (Number.isFinite(next)) {
-    return next;
-  }
   const end = Number(payload.segment?.endScrollTop);
   if (Number.isFinite(end)) {
     return end;
   }
+  const next = Number(payload.segment?.nextScrollTop);
+  if (Number.isFinite(next)) {
+    return next;
+  }
   const targetHeight = Number(payload.target?.totalHeight);
   return Number.isFinite(targetHeight) ? targetHeight : null;
+}
+
+function buildResumeTargetHint(payload) {
+  return {
+    mode: payload.target?.mode || "",
+    label: payload.target?.label || "",
+    totalHeight: payload.target?.totalHeight || 0,
+    fullTotalHeight: payload.segment?.fullTotalHeight || payload.target?.fullTotalHeight || payload.target?.totalHeight || 0,
+    visibleHeight: payload.target?.visibleHeight || 0
+  };
 }
 
 function normalizeCaptureMode(mode) {
@@ -205,6 +222,16 @@ function normalizeCaptureMode(mode) {
     return "current";
   }
   return "immediate";
+}
+
+function normalizeCaptureProfile(profile) {
+  if (profile === "default") {
+    return "default";
+  }
+  if (profile === "document" || profile === "ppt" || profile === "presentation" || profile === "slides" || profile === "auto") {
+    return "auto";
+  }
+  return "auto";
 }
 
 async function resolveCaptureTab(tabId) {
@@ -244,7 +271,7 @@ function launchCapture(tab, options = {}) {
       return;
     }
     console.error(error);
-    await showPageAlert(tab.id, `Full page capture failed: ${error.message || error}`).catch(() => {});
+    await showPageAlert(tab.id, formatCaptureErrorForUser(error)).catch(() => {});
   }).finally(() => {
     runningCaptures.delete(tab.id);
     setCaptureBadge(tab.id, "").catch(() => {});
@@ -304,18 +331,24 @@ async function startCapture(tab, controller) {
 
   await activateCaptureTab(tab.id, windowId, controller);
   await injectCaptureScripts(tab.id);
-  const targetFrame = await chooseCaptureFrame(tab.id);
+  const captureProfile = normalizeCaptureProfile(controller.options.captureProfile);
+  const targetFrame = await chooseCaptureFrame(tab.id, captureProfile);
   const topViewport = await getTopViewport(tab.id);
   let startScrollTop = Number(controller.options.startScrollTop) || 0;
+  let startPageIndex = null;
 
   let endScrollTop = null;
 
   if (controller.options.mode === "current") {
-    const current = await sendToFrame(tab.id, targetFrame.frameId, { type: "XF_GET_CURRENT_SCROLL_POSITION" });
+    const current = await sendToFrame(tab.id, targetFrame.frameId, {
+      type: "XF_GET_CURRENT_SCROLL_POSITION",
+      captureProfile
+    });
     if (!current?.ok) {
       throw new Error(current?.error || "Could not read the current page position.");
     }
     startScrollTop = Number.isFinite(Number(current.scrollTop)) ? Number(current.scrollTop) : 0;
+    startPageIndex = Number.isFinite(Number(current.pageIndex)) ? Math.max(0, Math.floor(Number(current.pageIndex))) : null;
   }
 
   if (controller.options.mode === "range") {
@@ -333,7 +366,8 @@ async function startCapture(tab, controller) {
   const prepared = await sendToFrame(tab.id, targetFrame.frameId, {
     type: "XF_PREPARE_CAPTURE",
     sessionId: controller.sessionId,
-    enableKeyStop: true
+    enableKeyStop: true,
+    captureProfile
   });
   if (!prepared?.ok) {
     throw new Error(prepared?.error || "Could not prepare the page.");
@@ -347,9 +381,25 @@ async function startCapture(tab, controller) {
     frameId: targetFrame.frameId,
     frameUrl: targetFrame.url,
     frameLabel: targetFrame.frameId === 0 ? "top frame" : "iframe",
+    captureProfile,
     totalHeight: 0,
     fullTotalHeight: prepared.target.totalHeight
   };
+
+  if (prepared.target.captureStrategy === "pages" && controller.options.mode !== "range") {
+    await capturePageSequence({
+      tab,
+      liveTab,
+      controller,
+      targetFrame,
+      topViewport,
+      frameOffset,
+      target,
+      startPageIndex
+    });
+    return;
+  }
+
   const slices = [];
   let nextScrollTop = clampScrollTop(startScrollTop, prepared.target);
   let previousScrollTop = -1;
@@ -513,6 +563,155 @@ async function startCapture(tab, controller) {
   await openCaptureResultTab(captureId, controller.options.resultTabId);
 }
 
+async function capturePageSequence({
+  tab,
+  liveTab,
+  controller,
+  targetFrame,
+  topViewport,
+  frameOffset,
+  target,
+  startPageIndex
+}) {
+  const pageCount = clampPageCount(target.pageCount);
+  const firstPageIndex = Number.isInteger(startPageIndex)
+    ? Math.max(0, Math.min(startPageIndex, pageCount - 1))
+    : 0;
+  const slices = [];
+  let stopReason = "complete";
+  let logicalTop = 0;
+  let lastLogicalHeight = 0;
+
+  try {
+    for (let pageIndex = firstPageIndex; pageIndex < pageCount && slices.length < MAX_SLICES; pageIndex += 1) {
+      if (controller.stopRequested && slices.length) {
+        stopReason = "user-stop";
+        break;
+      }
+
+      const tabReady = await waitForCaptureTabVisible(tab.id, controller.windowId, controller);
+      if (!tabReady) {
+        stopReason = "user-stop";
+        break;
+      }
+
+      const moved = await sendToFrame(tab.id, targetFrame.frameId, {
+        type: "XF_CAPTURE_PAGE_STEP",
+        pageIndex,
+        pageCount
+      });
+      if (!moved?.ok) {
+        throw new Error(moved?.error || `Could not open page ${pageIndex + 1}.`);
+      }
+
+      const logicalHeight = Math.max(
+        1,
+        Math.round(Number(moved.logicalHeight) || Number(moved.targetVisibleHeight) || Number(moved.cropRect?.height) || 1)
+      );
+      lastLogicalHeight = logicalHeight;
+
+      const dataUrl = moved.dataUrl || await captureVisibleTabQueued(controller.windowId, tab.id, controller);
+      if (!dataUrl) {
+        stopReason = "user-stop";
+        break;
+      }
+
+      const isPageImageCapture = moved.captureSource === "page-canvas";
+      const cropRect = isPageImageCapture
+        ? moved.cropRect
+        : offsetCropRect(moved.cropRect, frameOffset);
+      const viewport = isPageImageCapture && moved.viewport
+        ? moved.viewport
+        : topViewport;
+      target.visibleWidth = Math.max(target.visibleWidth || 0, cropRect.width || 0);
+      target.visibleHeight = logicalHeight;
+      target.totalHeight = logicalTop + logicalHeight;
+      target.fullTotalHeight = Math.max(target.fullTotalHeight || 0, pageCount * logicalHeight);
+      target.pageCount = pageCount;
+      target.captureStrategy = "pages";
+
+      slices.push({
+        index: slices.length,
+        dataUrl,
+        scrollTop: logicalTop,
+        absoluteScrollTop: Number.isFinite(Number(moved.absoluteScrollTop)) ? Number(moved.absoluteScrollTop) : pageIndex,
+        pageIndex: Number.isFinite(Number(moved.pageIndex)) ? Number(moved.pageIndex) : pageIndex,
+        pageNumber: Number.isFinite(Number(moved.pageNumber)) ? Number(moved.pageNumber) : pageIndex + 1,
+        cropRect,
+        viewport,
+        targetVisibleHeight: logicalHeight
+      });
+
+      logicalTop += logicalHeight;
+
+      if (controller.stopRequested) {
+        stopReason = "user-stop";
+        break;
+      }
+    }
+  } finally {
+    await sendToFrame(tab.id, targetFrame.frameId, { type: "XF_RESTORE_CAPTURE" }).catch(() => {});
+  }
+
+  if (!slices.length) {
+    if (stopReason === "user-stop") {
+      throw new CaptureCancelledError("Capture cancelled before any page was captured.");
+    }
+    throw new Error("No pages were captured.");
+  }
+
+  const reachedEnd = firstPageIndex + slices.length >= pageCount;
+  if (!reachedEnd && stopReason === "complete") {
+    stopReason = slices.length >= MAX_SLICES ? "page-limit" : "user-stop";
+  }
+
+  const captureId = crypto.randomUUID();
+  const payload = {
+    id: captureId,
+    capturedAt: new Date().toISOString(),
+    source: {
+      tabId: tab.id,
+      url: liveTab.url || tab.url || "",
+      title: liveTab.title || tab.title || ""
+    },
+    target: {
+      ...target,
+      totalHeight: logicalTop,
+      fullTotalHeight: pageCount * (lastLogicalHeight || target.visibleHeight || 1),
+      pageStartIndex: firstPageIndex,
+      pageEndIndex: firstPageIndex + slices.length - 1
+    },
+    segment: {
+      part: controller.options.segmentPart || 1,
+      parentCaptureId: controller.options.parentCaptureId || "",
+      startScrollTop: 0,
+      endScrollTop: logicalTop,
+      nextScrollTop: null,
+      fullTotalHeight: pageCount * (lastLogicalHeight || target.visibleHeight || 1),
+      limitHeight: null,
+      rangeEndScrollTop: null,
+      reason: stopReason,
+      canReturnToSource: false,
+      stoppedByUser: stopReason === "user-stop",
+      pageStartIndex: firstPageIndex,
+      pageEndIndex: firstPageIndex + slices.length - 1
+    },
+    slices
+  };
+  captures.set(captureId, payload);
+  await persistCapture(captureId, payload);
+
+  await openCaptureResultTab(captureId, controller.options.resultTabId);
+}
+
+function clampPageCount(value) {
+  const numeric = Math.floor(Number(value) || 0);
+  if (!Number.isFinite(numeric) || numeric <= 0) {
+    return 1;
+  }
+  return Math.min(numeric, MAX_SLICES);
+}
+
 async function openCaptureResultTab(captureId, resultTabId) {
   const url = chrome.runtime.getURL(`result/result.html?id=${encodeURIComponent(captureId)}`);
   if (Number.isInteger(resultTabId)) {
@@ -544,12 +743,15 @@ async function injectCaptureScripts(tabId) {
   }
 }
 
-async function chooseCaptureFrame(tabId) {
+async function chooseCaptureFrame(tabId, captureProfile = "default") {
   const frames = await getFrames(tabId);
   const measured = [];
 
   for (const frame of frames) {
-    const measurement = await sendToFrame(tabId, frame.frameId, { type: "XF_MEASURE_CAPTURE" }).catch(() => null);
+    const measurement = await sendToFrame(tabId, frame.frameId, {
+      type: "XF_MEASURE_CAPTURE",
+      captureProfile
+    }).catch(() => null);
     if (!measurement?.ok) {
       continue;
     }
@@ -571,12 +773,59 @@ async function chooseCaptureFrame(tabId) {
     });
   }
 
+  const topFrame = measured.find((frame) => frame.frameId === 0) || null;
+  for (const frame of measured) {
+    frame.score = adjustCaptureFrameScore(frame, topFrame, captureProfile);
+  }
+
   measured.sort((a, b) => b.score - a.score);
   const selected = measured[0];
   if (!selected) {
     throw new Error("Could not find a scrollable capture target.");
   }
   return selected;
+}
+
+function adjustCaptureFrameScore(frame, topFrame, captureProfile) {
+  let score = frame.score;
+  const hasPageCapture = frame.target?.captureStrategy === "pages";
+  if (isEmbeddedDocumentPreviewFrame(frame, topFrame, captureProfile)) {
+    score *= 0.04;
+  }
+  if (hasPageCapture) {
+    score *= frame.frameId === 0 ? 8 : 16;
+  }
+  return score;
+}
+
+function isEmbeddedDocumentPreviewFrame(frame, topFrame, captureProfile) {
+  if (!frame || frame.frameId === 0 || !topFrame) {
+    return false;
+  }
+  if (captureProfile !== "auto" && captureProfile !== "default") {
+    return false;
+  }
+
+  const topUrl = `${topFrame.url || ""} ${topFrame.target?.frameUrl || ""}`.toLowerCase();
+  if (!/(^|\.|\/\/)(feishu|larksuite)\./i.test(topUrl) || !/\/docx?\//i.test(topUrl)) {
+    return false;
+  }
+
+  const frameUrl = `${frame.url || ""} ${frame.target?.frameUrl || ""}`.toLowerCase();
+  const looksLikePreviewFrame = /preview_tpl|internal-api-drive-stream|tpl_id=pdf|mount_point=docx_file|source=docx_file|disablescrollbar/.test(frameUrl);
+  if (!looksLikePreviewFrame) {
+    return false;
+  }
+
+  const topWidth = Number(topFrame.target?.visibleWidth) || Number(topFrame.offset?.width) || 0;
+  const topHeight = Number(topFrame.target?.visibleHeight) || Number(topFrame.offset?.height) || 0;
+  const frameWidth = Number(frame.offset?.width) || Number(frame.target?.visibleWidth) || 0;
+  const frameHeight = Number(frame.offset?.height) || Number(frame.target?.visibleHeight) || 0;
+  const coverage = topWidth > 0 && topHeight > 0
+    ? (frameWidth * frameHeight) / (topWidth * topHeight)
+    : 0;
+
+  return coverage > 0 && coverage < 0.34;
 }
 
 async function getFrames(tabId) {
@@ -588,25 +837,31 @@ async function locateFrameOffset(tabId, frames, frameId) {
   let current = frames.find((frame) => frame.frameId === frameId);
   let x = 0;
   let y = 0;
+  let width = 0;
+  let height = 0;
 
   while (current && current.frameId !== 0) {
     const parent = frames.find((frame) => frame.frameId === current.parentFrameId);
     if (!parent) {
-      return { x: 0, y: 0, ok: false };
+      return { x: 0, y: 0, width: 0, height: 0, ok: false };
     }
 
     const list = await sendToFrame(tabId, parent.frameId, { type: "XF_LIST_IFRAMES" }).catch(() => null);
     const match = findMatchingIframe(list?.frames || [], current);
     if (!match) {
-      return { x: 0, y: 0, ok: false };
+      return { x: 0, y: 0, width: 0, height: 0, ok: false };
     }
 
+    if (!width || !height) {
+      width = Number(match.rect?.width) || 0;
+      height = Number(match.rect?.height) || 0;
+    }
     x += match.rect.left;
     y += match.rect.top;
     current = parent;
   }
 
-  return { x, y, ok: true };
+  return { x, y, width, height, ok: true };
 }
 
 function findMatchingIframe(iframes, frame) {
@@ -832,6 +1087,9 @@ function captureMeta(payload) {
     url: payload.source?.url || "",
     targetLabel: payload.target?.label || "",
     targetMode: payload.target?.mode || "",
+    captureProfile: payload.target?.captureProfile || "default",
+    captureStrategy: payload.target?.captureStrategy || "scroll",
+    pageCount: payload.target?.pageCount || null,
     sliceCount: payload.slices?.length || 0,
     totalHeight: payload.target?.totalHeight || 0,
     visibleWidth: payload.target?.visibleWidth || 0,
@@ -908,4 +1166,31 @@ async function showPageAlert(tabId, message) {
     func: (text) => window.alert(text),
     args: [message]
   });
+}
+
+function formatCaptureErrorForUser(error) {
+  const message = error?.message || String(error);
+  const oldPageNavigationMatch = message.match(/PPT page navigation landed on page (\d+) instead of (\d+)/i);
+  if (oldPageNavigationMatch) {
+    return [
+      "截图未完成：PPT 预览器没有成功跳到目标页。",
+      `当前停在第 ${oldPageNavigationMatch[1]} 页，目标是第 ${oldPageNavigationMatch[2]} 页。`,
+      "可以先点击左侧缩略图切到目标页后重试，或选择“从当前位置捕获”。"
+    ].join("\n");
+  }
+
+  const pageNavigationMatch = message.match(/PPT 页码跳转失败：目标第\s*(\d+)\s*页，当前仍在(.+?)。/);
+  if (pageNavigationMatch) {
+    return [
+      "截图未完成：PPT 预览器没有成功跳到目标页。",
+      `目标是第 ${pageNavigationMatch[1]} 页，当前仍在${pageNavigationMatch[2]}。`,
+      "可以先点击左侧缩略图切到目标页后重试，或选择“从当前位置捕获”。"
+    ].join("\n");
+  }
+
+  if (/Chrome does not allow capture scripts/i.test(message)) {
+    return "当前页面不允许扩展截图。请换到普通网页、飞书文档或 PPT 预览页后再试。";
+  }
+
+  return `截图失败：${message}`;
 }

@@ -27,10 +27,10 @@
         <section id="segmentSection" class="panel-section" hidden>
           <h2>分段</h2>
           <p id="segmentInfo" class="hint-text">本次截图已完成。</p>
-          <p id="segmentActionInfo" class="hint-text warning-text">请先导出当前段，再回到原文继续选择下一段。</p>
+          <p id="segmentActionInfo" class="hint-text warning-text">请先导出当前段，再回到结束位置继续选择下一段。</p>
           <div class="segment-actions">
-            <button id="openSourceAtEnd" type="button" disabled>回到原文结束位置</button>
-            <button id="startSourceAtEnd" type="button" disabled>从结束位置继续截取</button>
+            <button id="openSourceAtEnd" type="button" disabled>回到结束位置</button>
+            <button id="startSourceAtEnd" type="button" disabled>从结束位置继续获取</button>
           </div>
         </section>
 
@@ -47,40 +47,58 @@
           </div>
           <div id="sectionList" class="section-list" aria-live="polite"></div>
           <p class="hint-text warning-text">合并编辑器主要用于第一次没有截完整篇文章、需要分多节继续截取的情况。一次性截完时，直接在本页分页和导出即可。</p>
-          <p class="hint-text warning-text">页面内容过多时，先点击「从结束位置继续截取」获取剩余页面；截完多节后进入合并编辑器统一分页、合并及导出。</p>
+          <p class="hint-text warning-text">页面内容过多时，先点击「从结束位置继续获取」获取剩余页面；截完多节后进入合并编辑器统一分页、合并及导出。</p>
           <p class="hint-text">进入合并编辑器后，可在同一页面并排查看多节截图，并分别调整裁切、缩放和分页线；也可以把当前节参数套用到全部分节。</p>
         </section>
 
         <section class="panel-section">
           <h2>分页</h2>
-          <label>
-            纸张
-            <select id="paper">
-              <option value="a4">A4</option>
-              <option value="a3">A3</option>
-              <option value="a5">A5</option>
-              <option value="b5">B5</option>
-              <option value="letter">Letter</option>
-              <option value="legal">Legal</option>
-              <option value="tabloid">Tabloid</option>
-            </select>
-          </label>
-          <label>
-            方向
-            <select id="orientation">
-              <option value="portrait">竖版</option>
-              <option value="landscape">横版</option>
-            </select>
-          </label>
-          <label class="check-row">
-            <input id="includeMeta" type="checkbox" checked>
-            分页页脚显示页码和时间
-          </label>
           <p id="pageGuideInfo" class="hint-text">分页线会显示在右侧预览里。工作区预览如有模糊属正常，分页导出会使用原始切片，不影响导出清晰度。如果截取画面过多，内容预览会比较慢，请耐心等待。</p>
+          <details class="advanced-settings">
+            <summary>高级 PDF 参数</summary>
+            <label>
+              纸张
+              <select id="paper">
+                <option value="a4">A4</option>
+                <option value="a3">A3</option>
+                <option value="a5">A5</option>
+                <option value="b5">B5</option>
+                <option value="letter">Letter</option>
+                <option value="legal">Legal</option>
+                <option value="tabloid">Tabloid</option>
+              </select>
+            </label>
+            <label>
+              方向
+              <select id="orientation">
+                <option value="portrait">竖版</option>
+                <option value="landscape">横版</option>
+              </select>
+            </label>
+            <label class="check-row">
+              <input id="includeMeta" type="checkbox" checked>
+              页脚显示页码和时间
+            </label>
+            <label>
+              导出清晰度
+              <input id="exportScale" type="range" min="0.5" max="2" step="0.05" value="1">
+              <span id="exportScaleValue" class="value-readout">100%</span>
+            </label>
+          </details>
         </section>
 
         <section class="panel-section">
-          <h2>选区和缩放</h2>
+          <h2>预览</h2>
+          <label>
+            预览缩放
+            <input id="previewZoom" type="range" min="0.35" max="1.25" step="0.05" value="1">
+            <span id="previewZoomValue" class="value-readout">100%</span>
+          </label>
+          <button id="fitPreviewWidth" class="wide-action" type="button" disabled>适配当前宽度</button>
+        </section>
+
+        <section class="panel-section">
+          <h2>选区</h2>
           <label class="check-row">
             <input id="enableCrop" type="checkbox">
             使用选区导出
@@ -103,11 +121,6 @@
               <input id="cropHeight" type="number" min="1" step="1" value="1">
             </label>
           </div>
-          <label>
-            导出缩放
-            <input id="exportScale" type="range" min="0.5" max="2" step="0.05" value="1">
-            <span id="exportScaleValue" class="value-readout">100%</span>
-          </label>
           <div class="mini-actions">
             <button id="cropFull" type="button" disabled>全图</button>
             <button id="cropVisible" type="button" disabled>当前视图</button>
@@ -137,6 +150,10 @@
 
         <section class="panel-section">
           <h2>缓存</h2>
+          <label class="check-row">
+            <input id="autoClearAfterExport" type="checkbox">
+            导出后自动删除本次缓存
+          </label>
           <div class="mini-actions">
             <button id="refreshCaptureCache" type="button" disabled>查看缓存</button>
             <button id="clearCaptureCache" type="button" disabled>清空缓存</button>

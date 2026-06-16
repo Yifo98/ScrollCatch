@@ -5,6 +5,8 @@
   --text: #172026;
   --muted: #68737d;
   --line: #d8dee4;
+  --blue: #2563eb;
+  --blue-strong: #1d4ed8;
   --accent: #0f766e;
   --accent-strong: #115e59;
 }
@@ -14,7 +16,7 @@
 }
 
 body {
-  width: 280px;
+  width: 304px;
   margin: 0;
   background: var(--bg);
   color: var(--text);
@@ -23,8 +25,8 @@ body {
 
 .popup {
   display: grid;
-  gap: 14px;
-  padding: 16px;
+  gap: 12px;
+  padding: 15px;
 }
 
 .eyebrow {
@@ -49,12 +51,13 @@ h1 {
 
 .notice {
   display: grid;
-  gap: 4px;
+  gap: 3px;
   padding: 9px 10px;
-  border: 1px solid rgba(217, 119, 6, 0.34);
+  border: 1px solid rgba(37, 99, 235, 0.22);
+  border-left: 4px solid var(--blue);
   border-radius: 7px;
-  background: #fffbeb;
-  color: #92400e;
+  background: linear-gradient(90deg, rgba(37, 99, 235, 0.09), rgba(20, 184, 166, 0.055));
+  color: #1e3a8a;
 }
 
 .notice p {
@@ -63,10 +66,10 @@ h1 {
 
 .shortcut-card {
   display: grid;
-  gap: 7px;
-  padding: 10px;
+  gap: 6px;
+  padding: 9px;
   border: 1px solid rgba(37, 99, 235, 0.22);
-  border-left: 4px solid #2563eb;
+  border-left: 4px solid var(--blue);
   border-radius: 7px;
   background: linear-gradient(90deg, rgba(37, 99, 235, 0.11), rgba(20, 184, 166, 0.07));
   color: #1e3a8a;
@@ -106,19 +109,35 @@ h1 {
 }
 
 button {
-  min-height: 38px;
-  border: 1px solid var(--accent);
+  min-height: 36px;
+  border: 1px solid rgba(15, 118, 110, 0.26);
   border-radius: 7px;
-  background: var(--accent);
-  color: #fff;
+  background: linear-gradient(90deg, rgba(37, 99, 235, 0.11), rgba(20, 184, 166, 0.08));
+  color: var(--accent-strong);
   cursor: pointer;
   font: inherit;
   font-weight: 800;
+  box-shadow: 0 1px 0 rgba(15, 23, 42, 0.04);
+  transition: border-color 120ms ease, box-shadow 120ms ease, transform 120ms ease;
+}
+
+#captureNow {
+  border-color: transparent;
+  background: linear-gradient(90deg, var(--blue), var(--accent));
+  color: #fff;
+  box-shadow: 0 8px 18px rgba(37, 99, 235, 0.16);
 }
 
 button:not(:disabled):hover {
-  background: var(--accent-strong);
-  border-color: var(--accent-strong);
+  border-color: rgba(37, 99, 235, 0.34);
+  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.08);
+  transform: translateY(-1px);
+}
+
+#captureNow:not(:disabled):hover {
+  border-color: transparent;
+  background: linear-gradient(90deg, var(--blue-strong), var(--accent-strong));
+  box-shadow: 0 10px 22px rgba(37, 99, 235, 0.2);
 }
 
 button.secondary {

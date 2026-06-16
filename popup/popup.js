@@ -65,7 +65,7 @@ async function init() {
   elements.captureNow.disabled = running;
   elements.captureCurrent.disabled = running;
   elements.captureRange.disabled = running;
-  setStatus(running ? "正在截图。按 Esc 或点击停止，导出已截部分。" : "选择截图方式。");
+  setStatus(running ? "正在截图。按 Esc 或点击停止，导出已截部分。" : getIdleStatus(activeTab));
 }
 
 async function startCapture(mode) {
@@ -83,12 +83,7 @@ async function startCapture(mode) {
     if (!response?.ok) {
       throw new Error(response?.error || "启动截图失败。");
     }
-    const message = mode === "range"
-      ? "移动鼠标定位，点击页面正文或左下角按钮标记起点和终点。"
-      : mode === "current"
-        ? "已从当前滚动位置开始截图。"
-        : "已开始截图。";
-    setStatus(message);
+    setStatus(getStartStatus(mode));
     setTimeout(() => window.close(), 500);
   } catch (error) {
     setButtonsDisabled(false);
@@ -101,6 +96,23 @@ function setButtonsDisabled(disabled) {
   elements.captureCurrent.disabled = disabled;
   elements.captureRange.disabled = disabled;
   elements.stopCapture.disabled = disabled;
+}
+
+function getIdleStatus(tab) {
+  if (/(\.|\/\/)(feishu|larksuite)\./i.test(tab?.url || "")) {
+    return "检测到飞书页面。打开 PPT 预览后按页捕获，普通文档按页面滚动捕获。";
+  }
+  return "选择捕获方式。网页按滚动捕获，PPT 预览按页捕获。";
+}
+
+function getStartStatus(mode) {
+  if (mode === "range") {
+    return "在页面上标记起点和终点，也可以按 Enter 直接截到页面结尾。";
+  }
+  if (mode === "current") {
+    return "已从当前可见位置开始捕获。";
+  }
+  return "已开始捕获完整页面。PPT 按页捕获，网页滚动拼接。";
 }
 
 function setStatus(message, isError = false) {

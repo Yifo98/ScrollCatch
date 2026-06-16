@@ -25,6 +25,7 @@ rsync -a \
   manifest.json \
   background.js \
   content \
+  docs \
   icons \
   popup \
   result \

@@ -26,29 +26,32 @@
         <section class="panel-section">
           <h2>全局导出</h2>
           <p class="hint-text warning-text">合并编辑器主要用于同一篇文章分多节截取后的统一分页和导出。一次性截完时，直接在结果页导出即可，通常不用进入这里。</p>
-          <label>
-            纸张
-            <select id="paper">
-              <option value="a4">A4</option>
-              <option value="a3">A3</option>
-              <option value="a5">A5</option>
-              <option value="b5">B5</option>
-              <option value="letter">Letter</option>
-              <option value="legal">Legal</option>
-              <option value="tabloid">Tabloid</option>
-            </select>
-          </label>
-          <label>
-            方向
-            <select id="orientation">
-              <option value="portrait">竖版</option>
-              <option value="landscape">横版</option>
-            </select>
-          </label>
-          <label class="check-row">
-            <input id="includeMeta" type="checkbox" checked>
-            分页页脚显示页码和时间
-          </label>
+          <details class="advanced-settings">
+            <summary>高级 PDF 参数</summary>
+            <label>
+              纸张
+              <select id="paper">
+                <option value="a4">A4</option>
+                <option value="a3">A3</option>
+                <option value="a5">A5</option>
+                <option value="b5">B5</option>
+                <option value="letter">Letter</option>
+                <option value="legal">Legal</option>
+                <option value="tabloid">Tabloid</option>
+              </select>
+            </label>
+            <label>
+              方向
+              <select id="orientation">
+                <option value="portrait">竖版</option>
+                <option value="landscape">横版</option>
+              </select>
+            </label>
+            <label class="check-row">
+              <input id="includeMeta" type="checkbox" checked>
+              页脚显示页码和时间
+            </label>
+          </details>
         </section>
 
         <section class="panel-section">
@@ -85,7 +88,7 @@
         </section>
 
         <section class="panel-section">
-          <h2>选区和缩放</h2>
+          <h2>选区</h2>
           <label class="check-row">
             <input id="enableCrop" type="checkbox">
             使用选区导出
@@ -108,11 +111,14 @@
               <input id="cropHeight" type="number" min="1" step="1" value="1">
             </label>
           </div>
-          <label>
-            导出缩放
-            <input id="exportScale" type="range" min="0.5" max="2" step="0.05" value="1">
-            <span id="exportScaleValue" class="value-readout">100%</span>
-          </label>
+          <details class="advanced-settings">
+            <summary>高级导出清晰度</summary>
+            <label>
+              导出清晰度
+              <input id="exportScale" type="range" min="0.5" max="2" step="0.05" value="1">
+              <span id="exportScaleValue" class="value-readout">100%</span>
+            </label>
+          </details>
           <div class="mini-actions">
             <button id="cropFull" type="button" disabled>全图</button>
             <button id="cropVisible" type="button" disabled>当前视图</button>

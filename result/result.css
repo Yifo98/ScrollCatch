@@ -262,6 +262,30 @@ label {
   color: #92400e;
 }
 
+.advanced-settings {
+  display: grid;
+  gap: 10px;
+  padding: 9px 10px;
+  border: 1px solid rgba(15, 118, 110, 0.16);
+  border-radius: 7px;
+  background: rgba(20, 184, 166, 0.045);
+}
+
+.advanced-settings summary {
+  cursor: pointer;
+  color: var(--accent-strong);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.advanced-settings[open] summary {
+  margin-bottom: 4px;
+}
+
+.advanced-settings label + label {
+  margin-top: 8px;
+}
+
 .workflow-info {
   padding: 7px 9px;
   border: 1px solid rgba(15, 118, 110, 0.18);
@@ -756,6 +780,27 @@ canvas {
 
 .page-guide.is-automatic::before {
   display: none;
+}
+
+.page-guide.is-page-capture {
+  opacity: 0.95;
+}
+
+.page-guide.is-page-capture.is-automatic {
+  border-top-color: rgba(15, 118, 110, 0.9);
+}
+
+.page-guide.is-page-capture.is-custom::before {
+  height: 3px;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.92), 0 1px 6px rgba(15, 23, 42, 0.24);
+}
+
+.page-guide.is-page-capture.is-custom:not(.is-risk):not(.is-selected)::before {
+  background: rgba(15, 118, 110, 0.9);
+}
+
+.page-guide.is-page-capture:not(.is-risk):not(.is-selected) .page-guide-label {
+  background: rgba(15, 118, 110, 0.96);
 }
 
 .loading-overlay {

@@ -181,6 +181,32 @@ label {
   font-weight: 700;
 }
 
+.advanced-settings {
+  display: grid;
+  gap: 10px;
+  padding: 9px 10px;
+  border: 1px solid rgba(15, 118, 110, 0.16);
+  border-radius: 7px;
+  background: rgba(20, 184, 166, 0.045);
+}
+
+.advanced-settings summary {
+  cursor: pointer;
+  color: var(--accent-strong);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.advanced-settings[open] summary {
+  margin-bottom: 4px;
+}
+
+.advanced-settings label + label,
+.advanced-settings label + .check-row,
+.advanced-settings .check-row + label {
+  margin-top: 8px;
+}
+
 .mini-actions {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -487,6 +513,11 @@ label {
   background: rgba(220, 38, 38, 0.08);
 }
 
+.page-zone.is-page-capture {
+  border-color: rgba(15, 118, 110, 0.58);
+  background: rgba(20, 184, 166, 0.08);
+}
+
 .page-zone-label {
   position: sticky;
   top: 4px;
@@ -565,6 +596,14 @@ label {
 .page-line:hover::before {
   height: 4px;
   background: rgba(29, 78, 216, 0.96);
+}
+
+.page-line.is-page-capture::before {
+  background: rgba(15, 118, 110, 0.94);
+}
+
+.page-line.is-page-capture::after {
+  background: #0f766e;
 }
 
 .page-line:active {

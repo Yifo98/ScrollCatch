@@ -7,6 +7,8 @@
 - `dist/XF-FullPage-Capture-<version>/`
 - `dist/XF-FullPage-Capture-<version>.zip`
 
+发布包会包含 README、隐私政策、功能文档、扩展脚本、弹窗、结果页和图标资源。
+
 用法：
 
 ```bash

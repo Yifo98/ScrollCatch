@@ -10,29 +10,30 @@
     <main class="popup">
       <header>
         <p class="eyebrow">XF Capture</p>
-        <h1>长网页截图</h1>
+        <h1>网页捕获工作台</h1>
       </header>
 
       <section class="actions" aria-label="截图操作">
-        <button id="captureNow" type="button">立即截图</button>
-        <button id="captureCurrent" type="button">从当前位置开始截图</button>
-        <button id="captureRange" type="button">自定义起点/终点</button>
-        <button id="stopCapture" class="secondary" type="button" disabled>停止当前截图（Esc）</button>
+        <button id="captureNow" type="button">捕获完整页面</button>
+        <button id="captureCurrent" type="button">从当前位置捕获</button>
+        <button id="captureRange" type="button">框选捕获范围</button>
+        <button id="stopCapture" class="secondary" type="button" disabled>停止捕获（Esc）</button>
       </section>
 
       <section class="notice" aria-label="截图提醒">
-        <p>滚到目标位置后，可直接选择“从当前位置开始截图”。</p>
-        <p>自定义范围里，点击页面正文或左下角按钮都可以标记起点/终点。</p>
+        <p>PPT 预览页按左侧页码逐页捕获；普通网页按页面滚动拼接。</p>
+        <p>只想接着当前画面往下截，就选“从当前位置捕获”。</p>
+        <p>长网页图片很多时，先手动滚到页面底部预加载，再回到要开始的位置截图会更稳。</p>
       </section>
 
       <section class="shortcut-card" aria-label="快捷键">
         <p class="shortcut-title">截图快捷键</p>
-        <p><kbd>Enter</kbd><span>选好起点后截到页面结束</span></p>
-        <p><kbd>Esc</kbd><span>在源页面停止当前截图</span></p>
-        <p><kbd>Alt+Shift+S</kbd><span>切到其他标签后停止等待中的截图</span></p>
+        <p><kbd>Enter</kbd><span>选好起点后截到结尾</span></p>
+        <p><kbd>Esc</kbd><span>停止当前截图</span></p>
+        <p><kbd>Alt+Shift+S</kbd><span>切到其他标签后停止</span></p>
       </section>
 
-      <p id="status" class="status">选择截图方式。</p>
+      <p id="status" class="status">选择捕获方式。</p>
     </main>
 
     <script src="./popup.js"></script>
