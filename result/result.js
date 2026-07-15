@@ -1,16 +1,26 @@
 const params = new URLSearchParams(location.search);
 const captureId = params.get("id");
+const resultWorkflow = globalThis.XFResultWorkflow;
 
 const elements = {
   title: document.querySelector("#title"),
   meta: document.querySelector("#meta"),
   status: document.querySelector("#status"),
+  toggleEditorMode: document.querySelector("#toggleEditorMode"),
+  toggleEditorModeLabel: document.querySelector("#toggleEditorModeLabel"),
+  quickDraftNotice: document.querySelector("#quickDraftNotice"),
   canvas: document.querySelector("#preview"),
   canvasStage: document.querySelector("#canvasStage"),
+  previewEmptyState: document.querySelector("#previewEmptyState"),
   cropOverlay: document.querySelector("#cropOverlay"),
   segmentSection: document.querySelector("#segmentSection"),
   segmentInfo: document.querySelector("#segmentInfo"),
   segmentActionInfo: document.querySelector("#segmentActionInfo"),
+  segmentProgress: document.querySelector("#segmentProgress"),
+  segmentProgressBar: document.querySelector("#segmentProgressBar"),
+  segmentProgressLabel: document.querySelector("#segmentProgressLabel"),
+  resultActionHint: document.querySelector("#resultActionHint"),
+  openSourceOriginal: document.querySelector("#openSourceOriginal"),
   openSourceAtEnd: document.querySelector("#openSourceAtEnd"),
   startSourceAtEnd: document.querySelector("#startSourceAtEnd"),
   savePng: document.querySelector("#savePng"),
@@ -47,6 +57,7 @@ const elements = {
   clearCaptureCache: document.querySelector("#clearCaptureCache"),
   deleteCaptureCache: document.querySelector("#deleteCaptureCache"),
   autoClearAfterExport: document.querySelector("#autoClearAfterExport"),
+  autoClearAfterExportLabel: document.querySelector("#autoClearAfterExportLabel"),
   cacheList: document.querySelector("#cacheList"),
   cacheInfo: document.querySelector("#cacheInfo"),
   refreshSections: document.querySelector("#refreshSections"),
@@ -58,8 +69,10 @@ const elements = {
   reloadInfo: document.querySelector("#reloadInfo"),
   pageGuideOverlay: document.querySelector("#pageGuideOverlay"),
   loadingOverlay: document.querySelector("#loadingOverlay"),
+  loadingRunner: document.querySelector("#loadingRunner"),
   loadingTitle: document.querySelector("#loadingTitle"),
-  loadingDetail: document.querySelector("#loadingDetail")
+  loadingDetail: document.querySelector("#loadingDetail"),
+  continuousPreview: document.querySelector("#continuousPreview")
 };
 
 const paperSizes = {
@@ -90,13 +103,14 @@ let sectionMergeItems = [];
 let sectionMergeOrder = [];
 let selectedSectionIds = new Set();
 let activeSectionId = "";
+let quickPreviewPlan = { ids: [], pixelBudgetPerSection: 8_000_000 };
 
 const EDITOR_STATE_VERSION = 1;
 const EDITOR_STATE_PREFIX = "xfFullPageCapture:editor:";
 const LIFECYCLE_STATE_PREFIX = "xfFullPageCapture:lifecycle:";
 const LIFECYCLE_HISTORY_LIMIT = 24;
 const MAX_CANVAS_PIXELS = 220_000_000;
-const PREVIEW_PIXEL_BUDGET = 200_000_000;
+const PREVIEW_PIXEL_BUDGET = 32_000_000;
 const MAX_CANVAS_SIDE = 65535;
 const PDF_PAGE_SAFE_MIN_RATIO = 0.92;
 const PDF_PAGE_SAFE_MAX_RATIO = 1.08;
@@ -106,10 +120,38 @@ const PAGE_GUIDE_SIDE_HIT_PADDING_PX = 18;
 const PAGE_SESSION_ID = crypto.randomUUID();
 const LOAD_DIAGNOSTICS = readLoadDiagnostics();
 
-init().catch((error) => {
+Promise.resolve(globalThis.XFI18n?.ready?.())
+  .then(() => globalThis.XFI18n?.applyDocument?.(document))
+  .then(() => init())
+  .catch((error) => {
   reportHandledError(error);
   hideLoadingOverlay();
+  showPreviewError();
   setStatus(error.message || String(error), true);
+});
+
+globalThis.XFI18n?.subscribe?.(() => {
+  if (!capture) {
+    return;
+  }
+  updateCaptureHeader();
+  updateSegmentControls();
+  updateScaleReadout();
+  renderSectionManager();
+  if (sectionMergeItems.length) {
+    renderCaptureCacheList(sectionMergeItems);
+  }
+  if (elements.canvas.width) {
+    updatePageGuides();
+  }
+  globalThis.XFI18n?.applyDocument?.(document);
+});
+
+elements.toggleEditorMode.addEventListener("click", () => {
+  toggleUnifiedEditor().catch((error) => {
+    reportHandledError(error);
+    setStatus(error.message || String(error), true);
+  });
 });
 
 elements.savePng.addEventListener("click", () => {
@@ -121,8 +163,8 @@ elements.savePagedPng.addEventListener("click", async () => {
     setBusy(true, "正在生成高清分页 PNG ZIP...", "会按当前选区和分页线逐页渲染高清图片。");
     const zipBytes = await buildPagedPngZip();
     downloadBlob(new Blob([zipBytes], { type: "application/zip" }), `${baseFilename()}-paged-png.zip`);
-    const cleaned = await maybeAutoDeleteCurrentCaptureCache();
-    setStatus(cleaned ? "分页 PNG ZIP 已交给浏览器下载，并已删除本次缓存。" : "分页 PNG ZIP 已交给浏览器下载。");
+    const cleanup = await maybeAutoDeleteCurrentCaptureCache();
+    setStatus(formatExportCompletionStatus("分页 PNG ZIP 已交给浏览器下载。", cleanup));
   } catch (error) {
     reportHandledError(error);
     setStatus(error.message || String(error), true);
@@ -145,8 +187,8 @@ elements.savePagedJpeg.addEventListener("click", async () => {
       label: "JPEG"
     });
     downloadBlob(new Blob([zipBytes], { type: "application/zip" }), `${baseFilename()}-paged-jpeg.zip`);
-    const cleaned = await maybeAutoDeleteCurrentCaptureCache();
-    setStatus(cleaned ? "分页 JPEG ZIP 已交给浏览器下载，并已删除本次缓存。" : "分页 JPEG ZIP 已交给浏览器下载。");
+    const cleanup = await maybeAutoDeleteCurrentCaptureCache();
+    setStatus(formatExportCompletionStatus("分页 JPEG ZIP 已交给浏览器下载。", cleanup));
   } catch (error) {
     reportHandledError(error);
     setStatus(error.message || String(error), true);
@@ -168,8 +210,8 @@ elements.savePdf.addEventListener("click", async () => {
     setBusy(true, "正在生成高清分页 PDF...", "会使用当前选区和最新分页线重新渲染。");
     const pdfBytes = await buildPdfBytes();
     downloadBlob(new Blob([pdfBytes], { type: "application/pdf" }), `${baseFilename()}.pdf`);
-    const cleaned = await maybeAutoDeleteCurrentCaptureCache();
-    setStatus(cleaned ? "PDF 已交给浏览器下载，并已删除本次缓存。" : "PDF 已交给浏览器下载。");
+    const cleanup = await maybeAutoDeleteCurrentCaptureCache();
+    setStatus(formatExportCompletionStatus("PDF 已交给浏览器下载。", cleanup));
   } catch (error) {
     reportHandledError(error);
     setStatus(error.message || String(error), true);
@@ -285,8 +327,15 @@ elements.deleteCaptureCache.addEventListener("click", () => {
   });
 });
 
+elements.openSourceOriginal.addEventListener("click", () => {
+  openSourceArticle(false).catch((error) => {
+    reportHandledError(error);
+    setStatus(error.message || String(error), true);
+  });
+});
+
 elements.openSourceAtEnd.addEventListener("click", () => {
-  openSourceAtSegmentEnd().catch((error) => {
+  openSourceArticle(true).catch((error) => {
     reportHandledError(error);
     setStatus(error.message || String(error), true);
   });
@@ -431,19 +480,22 @@ async function init() {
   }
 
   capture = response.payload;
+  await prepareLinkedCaptureContext();
+  updateCaptureSpecificActions();
   markLifecycleEvent("init");
   updateReloadDiagnostics();
-  elements.title.textContent = capture.source.title || "完整页面截图";
-  elements.meta.textContent = `${capture.target.label} · ${formatTargetMode()} · ${formatCaptureUnit({
-    captureStrategy: capture.target.captureStrategy,
-    pageCount: capture.target.pageCount,
-    sliceCount: capture.slices.length
-  })}${formatSegmentMeta()} · ${capture.source.url}`;
+  updateCaptureHeader();
   updateSegmentControls();
   updateLoadingMessage("正在拼接截图切片...", "页面内容较多时需要读取和拼接多张切片，请稍等。");
   setStatus("正在拼接截图切片...");
+  elements.toggleEditorMode.disabled = false;
 
-  await composePreview();
+  if (quickPreviewPlan.ids.length > 1) {
+    updateLoadingMessage("正在准备连续截图完整预览...", `正在按顺序读取 ${quickPreviewPlan.ids.length} 个分段。`);
+    await composeContinuousQuickPreview();
+  } else {
+    await composePreview();
+  }
   fitPreviewWidth({ silent: true, onlyIfOverflowing: true });
 
   const restored = restoreEditorState();
@@ -452,29 +504,75 @@ async function init() {
   }
   const repairedPageCaptureDefaults = applyPageCaptureDefaults({ preserveLayout: restored });
   isEditorStateReady = true;
+  elements.toggleEditorMode.disabled = false;
   updateScaleReadout();
   updatePaginationControls();
   updatePageGuides();
   if (repairedPageCaptureDefaults) {
     saveEditorStateNow();
   }
+  updateQuickDraftNotice();
   setExportControlsEnabled(true);
   updateCacheControls();
-  await refreshCaptureCacheList();
   const sizeNote = formatCompositionSizeNote();
   setStatus(restored
-    ? `已恢复上次编辑草稿：${elements.canvas.width} x ${elements.canvas.height}px。${sizeNote}`
-    : `拼接完成：${elements.canvas.width} x ${elements.canvas.height}px。${sizeNote}`);
+    ? `${t(`已恢复上次编辑草稿：${elements.canvas.width} x ${elements.canvas.height}px。`)}${sizeNote}`
+    : `${t(`拼接完成：${elements.canvas.width} x ${elements.canvas.height}px。`)}${sizeNote}`);
   hideLoadingOverlay();
+  refreshCaptureCacheList().catch((error) => {
+    reportHandledError(error);
+    elements.cacheInfo.textContent = "缓存与截图段列表暂时未能刷新，不影响当前预览和导出。";
+  });
   updateReloadDiagnostics();
+}
+
+function updateCaptureHeader() {
+  if (!capture) {
+    return;
+  }
+  elements.title.textContent = capture.source.title || t("完整页面截图");
+  elements.meta.textContent = `${formatTargetLabel()} · ${formatTargetMode()} · ${formatCaptureUnit({
+    captureStrategy: capture.target.captureStrategy,
+    pageCount: capture.target.pageCount,
+    sliceCount: capture.slices.length
+  })}${formatSegmentMeta()} · ${capture.source.url}`;
+}
+
+function formatTargetLabel() {
+  const label = String(capture?.target?.label || "").trim();
+  if (globalThis.XFI18n?.getLocale?.() === "en") {
+    return t(label);
+  }
+  if (label === "Page window") {
+    return "页面窗口";
+  }
+  if (label === "PDF.js page window") {
+    return "PDF.js 页面窗口";
+  }
+  if (label === "Document/PPT page window") {
+    return "文档 / PPT 页面窗口";
+  }
+  if (label === "PPT pages: page window") {
+    return "PPT 分页窗口";
+  }
+  if (label.startsWith("PPT pages: ")) {
+    return `PPT 分页：${label.slice("PPT pages: ".length)}`;
+  }
+  if (label.startsWith("Document/PPT viewer: ")) {
+    return `文档 / PPT 查看器：${label.slice("Document/PPT viewer: ".length)}`;
+  }
+  return label || "页面窗口";
+}
+
+function t(value) {
+  return globalThis.XFI18n?.translateText?.(value) ?? value;
 }
 
 function formatTargetMode() {
   if (isPageCapture()) {
-    const pageCount = Number(capture.target.pageCount) || capture.slices.length;
-    return `按页捕获 · ${pageCount} 页`;
+    return t("按页捕获");
   }
-  return capture.target.mode === "inner-scroll" ? "内层滚动容器" : "页面滚动";
+  return t(capture.target.mode === "inner-scroll" ? "内层滚动容器" : "页面滚动");
 }
 
 function isPageCapture() {
@@ -482,71 +580,149 @@ function isPageCapture() {
     || capture?.target?.captureMode === "pages";
 }
 
+function updateCaptureSpecificActions() {
+  const keepPagedActionsVisible = resultWorkflow.shouldKeepPagedExportsVisible(capture);
+  elements.savePagedPng.classList.toggle("quick-page-action", keepPagedActionsVisible);
+  elements.savePagedJpeg.classList.toggle("quick-page-action", keepPagedActionsVisible);
+}
+
 function formatSegmentMeta() {
   if (!capture?.segment || (capture.segment.part || 1) <= 1 && !hasSegmentResumePosition(capture.segment) && capture.segment.reason === "complete") {
     return "";
   }
-  return ` · 第 ${capture.segment.part || 1} 段`;
+  return ` · ${t(`第 ${capture.segment.part || 1} 段`)}`;
 }
 
 function updateSegmentControls() {
-  if (!elements.segmentSection || !elements.openSourceAtEnd || !elements.startSourceAtEnd) {
+  if (!elements.segmentSection || !elements.openSourceOriginal || !elements.openSourceAtEnd || !elements.startSourceAtEnd) {
     return;
   }
 
   const segment = capture?.segment;
-  const canReturn = hasSegmentResumePosition(segment);
-  const shouldShow = Boolean(segment && ((segment.part || 1) > 1 || canReturn || segment.reason !== "complete"));
-  elements.segmentSection.hidden = !shouldShow;
-  if (!shouldShow) {
+  const actionState = resultWorkflow.getSourceActionState(capture);
+  updateResultActionCopy(actionState);
+  elements.segmentSection.hidden = !actionState.show;
+  if (!actionState.show) {
     return;
   }
 
-  const start = Math.round(segment.startScrollTop || 0);
-  const end = Math.round(segment.endScrollTop || capture.target.totalHeight || 0);
-  const full = Math.round(segment.fullTotalHeight || end);
-  const range = full > 0 ? `${Math.round(start / 100) / 10}k-${Math.round(end / 100) / 10}k / ${Math.round(full / 100) / 10}k px` : "";
-  const reason = describeSegmentReason(segment.reason);
-  const limit = segment.limitHeight ? `单段上限 ${Math.round(segment.limitHeight / 100) / 10}k px` : "";
-  elements.segmentInfo.textContent = [
-    `第 ${segment.part || 1} 段`,
-    reason,
-    range,
-    limit
-  ].filter(Boolean).join(" · ");
-  elements.segmentActionInfo.textContent = getSegmentActionMessage(segment, canReturn);
-  elements.openSourceAtEnd.disabled = !canReturn;
-  elements.startSourceAtEnd.disabled = !canReturn;
+  if (segment) {
+    const start = Math.round(segment.startScrollTop || 0);
+    const end = Math.round(segment.endScrollTop || capture.target.totalHeight || 0);
+    const full = Math.round(segment.fullTotalHeight || end);
+    const range = full > 0 ? `${Math.round(start / 100) / 10}k-${Math.round(end / 100) / 10}k / ${Math.round(full / 100) / 10}k px` : "";
+    const reason = describeSegmentReason(segment.reason);
+    elements.segmentInfo.textContent = actionState.canContinue
+      ? [`第 ${segment.part || 1} 段`, reason, range].filter(Boolean).join(" · ")
+      : `本页已完成截图${(segment.part || 1) > 1 ? ` · 第 ${segment.part} 段` : ""}`;
+    updateSegmentProgress({ end, full, part: Number(segment.part) || 1, canContinue: actionState.canContinue });
+  } else {
+    elements.segmentInfo.textContent = "本页已完成截图。";
+    updateSegmentProgress(null);
+  }
+  elements.segmentActionInfo.textContent = actionState.canContinue
+    ? "可以直接回到原文，也可以查看保存的衔接位置后继续截取。"
+    : actionState.canReturnToSavedEnd
+      ? "可以回到原文，或定位到本次截图的结束位置进行核对。"
+      : "可以随时回到原文；本次截图已经结束，不会误触发重复续截。";
+  elements.openSourceOriginal.disabled = !actionState.canReturn;
+  elements.openSourceAtEnd.hidden = !actionState.canReturnToSavedEnd;
+  elements.openSourceAtEnd.disabled = !actionState.canReturnToSavedEnd || hasDeletedCaptureCache;
+  elements.startSourceAtEnd.hidden = !actionState.canContinue;
+  elements.startSourceAtEnd.disabled = !actionState.canContinue || hasDeletedCaptureCache;
 }
 
-async function openSourceAtSegmentEnd() {
-  if (!hasSegmentResumePosition(capture?.segment)) {
-    setStatus("当前截图没有可返回的结束位置。");
+function updateSegmentProgress(progress) {
+  if (!progress || progress.full <= 0) {
+    elements.segmentProgress.hidden = true;
+    elements.segmentProgressLabel.hidden = true;
+    return;
+  }
+  const percent = clamp(Math.round(progress.end / progress.full * 100), 0, 100);
+  const remaining = Math.max(0, progress.full - progress.end);
+  elements.segmentProgress.hidden = false;
+  elements.segmentProgressLabel.hidden = false;
+  elements.segmentProgress.setAttribute("aria-valuenow", String(percent));
+  elements.segmentProgressBar.style.width = `${percent}%`;
+  elements.segmentProgressLabel.textContent = progress.canContinue
+    ? `整页已完成约 ${percent}% · 还剩约 ${Math.round(remaining / 100) / 10}k px`
+    : `已到达文章末尾${progress.part > 1 ? ` · 共 ${progress.part} 段` : ""}`;
+}
+
+function updateResultActionCopy(actionState) {
+  const linkedSections = quickPreviewPlan.ids.length > 1;
+  const currentSegmentOnly = Boolean(actionState?.canContinue || linkedSections);
+  const pageCapture = isPageCapture();
+  document.body.dataset.captureStatus = currentSegmentOnly ? "incomplete" : "complete";
+  elements.savePng.textContent = t(pageCapture
+    ? "保存整张 PNG"
+    : currentSegmentOnly ? "保存当前段 PNG" : "保存 PNG");
+  elements.saveJpeg.textContent = t(currentSegmentOnly ? "保存当前段 JPEG" : "保存 JPEG");
+  elements.savePdf.textContent = t(currentSegmentOnly ? "保存当前段 PDF" : "保存 PDF");
+  elements.savePagedPng.textContent = t(pageCapture ? "导出每页 PNG" : "分页 PNG");
+  elements.savePagedJpeg.textContent = t(pageCapture ? "导出每页 JPEG" : "分页 JPEG");
+  elements.autoClearAfterExportLabel.textContent = currentSegmentOnly
+    ? t("完成连续截图并合并导出后，自动删除全部截图缓存")
+    : t("导出后自动删除本次截图缓存");
+  elements.resultActionHint.textContent = t(linkedSections
+    ? `已关联 ${quickPreviewPlan.ids.length} 段并在右侧完整显示。推荐进入编辑工作台同步裁切、分页并合并导出 PDF。`
+    : currentSegmentOnly
+      ? "这只是长页的当前分段。建议优先继续截取；如果只需要本段，也可以保存当前段 PDF。"
+    : pageCapture
+      ? "演示稿已按页截取。可以保存整张预览，也可以在更多格式中逐页导出。"
+      : "推荐进入编辑工作台完成裁切和分页；也可以直接保存当前 PDF。");
+}
+
+async function openSourceArticle(atSavedEnd) {
+  const actionState = resultWorkflow.getSourceActionState(capture);
+  const canOpen = atSavedEnd ? actionState.canReturnToSavedEnd : actionState.canReturn;
+  if (!canOpen) {
+    setStatus(atSavedEnd ? "当前截图没有可定位的结束位置。" : "当前截图没有可返回的原文地址。");
     return;
   }
 
-  setBusy(true, "正在回到结束位置...", "正在定位上次截图结束的位置。");
+  setBusy(
+    true,
+    atSavedEnd ? "正在定位结束位置..." : "正在回到原文...",
+    "如果原标签页已经关闭，会重新打开原文。"
+  );
   try {
     const response = await chrome.runtime.sendMessage({
-      type: "OPEN_SOURCE_AT_SCROLL",
-      captureId
+      type: atSavedEnd ? "OPEN_SOURCE_AT_SCROLL" : "OPEN_SOURCE",
+      captureId,
+      source: capture?.source || null,
+      capture: buildSourceResumeSnapshot()
     });
     if (!response?.ok) {
       throw new Error(response?.error || "Could not return to the source page.");
     }
-    setStatus("已回到结束位置。可在扩展弹窗选择“从当前位置捕获”。");
+    setStatus(atSavedEnd ? "已定位到本段结束位置。" : "已回到原文。");
   } finally {
     setBusy(false);
   }
 }
 
+function buildSourceResumeSnapshot() {
+  return {
+    id: capture?.id || captureId,
+    source: capture?.source || null,
+    target: capture?.target ? {
+      frameId: capture.target.frameId,
+      captureProfile: capture.target.captureProfile,
+      containerSelector: capture.target.containerSelector,
+      kind: capture.target.kind
+    } : null,
+    segment: capture?.segment || null
+  };
+}
+
 async function startCaptureAtSegmentEnd() {
-  if (!hasSegmentResumePosition(capture?.segment)) {
+  if (!resultWorkflow.getSourceActionState(capture).canContinue) {
     setStatus("当前截图没有可继续获取的结束位置。");
     return;
   }
 
-  setBusy(true, "正在回到结束位置并继续获取...", "正在恢复原页面并启动下一段截图。");
+  setBusy(true, "正在恢复原文并继续截取...", "正在定位已保存的结束位置，然后启动下一段截图。");
   try {
     const response = await chrome.runtime.sendMessage({
       type: "START_CAPTURE_FROM_SOURCE_SCROLL",
@@ -555,30 +731,14 @@ async function startCaptureAtSegmentEnd() {
     if (!response?.ok) {
       throw new Error(response?.error || "Could not start from the source page position.");
     }
-    setStatus("已从结束位置继续获取。新结果页会自动打开。");
+    setStatus("已从保存的结束位置开始下一段截图。新结果会回到当前标签页。");
   } finally {
     setBusy(false);
   }
 }
 
 function hasSegmentResumePosition(segment) {
-  return Number.isFinite(Number(segment?.nextScrollTop)) || Number.isFinite(Number(segment?.endScrollTop));
-}
-
-function getSegmentActionMessage(segment, canReturn) {
-  if (segment?.reason === "segment-limit") {
-    return canReturn
-      ? "已到达插件单段上限。请先导出当前段，再从结束位置继续获取下一段；也可以先回到结束位置确认。"
-      : "已到达插件单段上限。请先导出当前段；当前缓存没有可返回的结束位置。";
-  }
-  if (segment?.reason === "user-stop") {
-    return canReturn
-      ? "已按停止导出当前段。可以先保存，再回到结束位置继续选择下一段。"
-      : "已按停止导出当前段。";
-  }
-  return canReturn
-    ? "可以先导出当前段，再回到结束位置继续选择下一段。"
-    : "当前段已完成。";
+  return resultWorkflow.hasResumePosition(segment);
 }
 
 function describeSegmentReason(reason) {
@@ -821,6 +981,13 @@ function saveEditorStateNow() {
   }
 
   clearTimeout(editorStateSaveTimer);
+  // The quick-result page should not create an empty editor draft merely
+  // because the tab is hidden or the user enters the workbench. Otherwise
+  // that pristine draft overrides the workbench's default-on pagination.
+  if (!hasProtectableEditorWork()) {
+    localStorage.removeItem(editorStateKey());
+    return;
+  }
   const state = buildCurrentEditorState();
 
   try {
@@ -885,7 +1052,7 @@ async function refreshSectionManager() {
     throw new Error(response?.error || "Could not list cached captures.");
   }
   updateSectionManagerFromCaptures(response.captures || [], { resetSelection: false });
-  setStatus("分节列表已刷新。");
+  setStatus("截图段列表已刷新。");
 }
 
 function updateSectionManagerFromCaptures(items, options = {}) {
@@ -933,8 +1100,7 @@ function sortSectionMergeItems(items) {
 }
 
 function defaultSectionSelection(items) {
-  const sameSource = items.filter((item) => item.url && item.url === capture?.source?.url).map((item) => item.id);
-  return sameSource.length ? sameSource : [captureId].filter(Boolean);
+  return resultWorkflow.getContinuousCaptureIds(items, captureId);
 }
 
 function renderSectionManager() {
@@ -948,7 +1114,7 @@ function renderSectionManager() {
   if (!sectionMergeItems.length) {
     const empty = document.createElement("p");
     empty.className = "hint-text";
-    empty.textContent = "暂无可合并的截图节。";
+    empty.textContent = "暂无可添加的其他截图。";
     elements.sectionList.appendChild(empty);
   } else {
     for (const item of orderedItems) {
@@ -960,11 +1126,11 @@ function renderSectionManager() {
   const totalHeight = orderedItems
     .filter((item) => selectedSectionIds.has(item.id))
     .reduce((sum, item) => sum + (Number(item.totalHeight) || 0), 0);
-  elements.sectionMergeInfo.textContent = selectedCount
-    ? `已选择 ${selectedCount} 节，合计约 ${Math.round(totalHeight / 100) / 10}k px。合并编辑器适合第一次没截完整时使用；一次截完通常不用进入。`
-    : "请选择至少一节后再合并。";
+  elements.sectionMergeInfo.textContent = selectedCount >= 2
+    ? `已选择 ${selectedCount} 段，合计约 ${Math.round(totalHeight / 100) / 10}k px。`
+    : "当前段已选；再选择至少一个截图段即可进入多段模式。";
   elements.refreshSections.disabled = !captureId;
-  elements.openMergeEditor.disabled = selectedCount < 1;
+  elements.openMergeEditor.disabled = selectedCount < 2;
   elements.moveSectionUp.disabled = !activeSectionId || sectionMergeOrder.indexOf(activeSectionId) <= 0;
   elements.moveSectionDown.disabled = !activeSectionId || sectionMergeOrder.indexOf(activeSectionId) < 0 || sectionMergeOrder.indexOf(activeSectionId) >= sectionMergeOrder.length - 1;
 }
@@ -990,7 +1156,7 @@ function renderSectionItem(item) {
   const meta = document.createElement("p");
   meta.className = "section-meta";
   meta.textContent = [
-    item.segment?.part ? `第 ${item.segment.part} 节` : "独立截图",
+    item.segment?.part ? `第 ${item.segment.part} 段` : "独立截图",
     formatDateTime(item.capturedAt),
     formatCaptureUnit(item),
     `${Math.round((item.totalHeight || 0) / 100) / 10}k px`
@@ -1076,9 +1242,9 @@ function renderCaptureCacheList(items) {
 
 function formatCaptureUnit(item) {
   if (item.captureStrategy === "pages") {
-    return `${item.pageCount || item.sliceCount || 0} 页`;
+    return t(`${item.pageCount || item.sliceCount || 0} 页`);
   }
-  return `${item.sliceCount || 0} 张切片`;
+  return t(`${item.sliceCount || 0} 张切片`);
 }
 
 function updateCacheControls(items = null) {
@@ -1088,7 +1254,7 @@ function updateCacheControls(items = null) {
   elements.deleteCaptureCache.disabled = !hasCapture || hasDeletedCaptureCache;
   elements.clearCaptureCache.disabled = !hasCapture || count === null || count === 0;
   elements.cacheInfo.textContent = hasDeletedCaptureCache
-    ? "本次截图缓存已删除；当前页面未刷新前仍可继续导出。"
+    ? "本次截图缓存已删除；当前预览仍可查看，但不能再次高清导出。"
     : "关闭结果页后，本次截图缓存仍会暂存在浏览器本机，可在这里查看或删除。";
 }
 
@@ -1096,17 +1262,45 @@ function openCaptureResult(targetCaptureId) {
   window.open(chrome.runtime.getURL(`result/result.html?id=${encodeURIComponent(targetCaptureId)}`), "_blank", "noopener");
 }
 
-function openMergeEditor() {
-  const ids = sectionMergeOrder.filter((id) => selectedSectionIds.has(id));
+function openMergeEditor(explicitIds = null) {
+  const ids = Array.isArray(explicitIds)
+    ? explicitIds
+    : sectionMergeOrder.filter((id) => selectedSectionIds.has(id));
   if (!ids.length) {
-    setStatus("请先选择要进入合并编辑器的截图节。", true);
+    setStatus("没有找到可编辑的截图内容。", true);
     return;
   }
 
   const params = new URLSearchParams();
   params.set("ids", ids.join(","));
   params.set("from", captureId);
+  params.set("pagination", "on");
   location.href = chrome.runtime.getURL(`result/merge.html?${params.toString()}`);
+}
+
+async function toggleUnifiedEditor() {
+  if (!sectionMergeItems.some((item) => item.id === captureId)) {
+    const response = await chrome.runtime.sendMessage({ type: "LIST_CAPTURES" });
+    if (!response?.ok) {
+      throw new Error(response?.error || "Could not prepare the editor.");
+    }
+    updateSectionManagerFromCaptures(response.captures || [], { resetSelection: true });
+  }
+
+  const continuousIds = resultWorkflow.getContinuousCaptureIds(sectionMergeItems, captureId);
+  openMergeEditor(continuousIds.length ? continuousIds : [captureId]);
+}
+
+function setEditorMode(isEditor) {
+  document.body.dataset.mode = isEditor ? "editor" : "quick";
+  elements.toggleEditorModeLabel.textContent = isEditor ? t("返回快速结果") : t("进入编辑工作台");
+  elements.toggleEditorMode.setAttribute("aria-pressed", String(isEditor));
+  updateQuickDraftNotice();
+  requestAnimationFrame(() => {
+    fitPreviewWidth({ silent: true, onlyIfOverflowing: true });
+    updateCropOverlay();
+    updatePageGuides();
+  });
 }
 
 async function deleteCurrentCaptureCache() {
@@ -1114,7 +1308,7 @@ async function deleteCurrentCaptureCache() {
     setStatus("本次截图缓存已经删除。");
     return;
   }
-  const ok = window.confirm("删除本次截图缓存？当前页面未刷新前仍可继续导出，但刷新后不能再恢复这次截图。");
+  const ok = window.confirm(t("删除本次截图缓存？删除后只能继续查看当前预览，不能再次高清导出；刷新后也无法恢复这次截图。"));
   if (!ok) {
     return;
   }
@@ -1134,20 +1328,161 @@ async function deleteCaptureCacheById(id, options = {}) {
 
   await refreshCaptureCacheList();
   if (!options.silent) {
-    setStatus(id === captureId ? "本次截图缓存已删除，当前预览仍可继续导出。" : "已删除选中的截图缓存。");
+    setStatus(id === captureId ? "本次截图缓存已删除，当前预览仍可查看，但不能再次高清导出。" : "已删除选中的截图缓存。");
   }
+  enforceDeletedCaptureState();
 }
 
 async function maybeAutoDeleteCurrentCaptureCache() {
   if (!elements.autoClearAfterExport?.checked || hasDeletedCaptureCache) {
-    return false;
+    return "unchanged";
+  }
+  if (resultWorkflow.shouldKeepCaptureCacheAfterExport(capture, { linkedSectionCount: quickPreviewPlan.ids.length })) {
+    return "retained";
   }
   await deleteCaptureCacheById(captureId, { silent: true });
-  return true;
+  return "deleted";
+}
+
+function formatExportCompletionStatus(baseMessage, cleanup) {
+  const message = t(baseMessage);
+  if (cleanup === "deleted") {
+    return `${message} ${t("已删除本次缓存。")}`;
+  }
+  if (cleanup === "retained") {
+    return `${message} ${t("为保持续截和后续合并，已保留当前分段缓存。")}`;
+  }
+  return message;
+}
+
+async function prepareLinkedCaptureContext() {
+  const response = await chrome.runtime.sendMessage({ type: "LIST_CAPTURES" });
+  if (!response?.ok) {
+    quickPreviewPlan = { ids: [captureId], pixelBudgetPerSection: 8_000_000 };
+    return;
+  }
+  const items = Array.isArray(response.captures) ? response.captures : [];
+  updateSectionManagerFromCaptures(items, { resetSelection: true });
+  quickPreviewPlan = resultWorkflow.getQuickPreviewPlan(items, captureId, 8_000_000);
+  if (!quickPreviewPlan.ids.length) {
+    quickPreviewPlan = { ids: [captureId], pixelBudgetPerSection: 8_000_000 };
+  }
+}
+
+async function composeContinuousQuickPreview() {
+  if (!elements.continuousPreview || quickPreviewPlan.ids.length < 2) {
+    return;
+  }
+  elements.continuousPreview.replaceChildren();
+  elements.continuousPreview.hidden = false;
+  elements.canvasStage.hidden = true;
+  document.body.dataset.continuousPreview = "true";
+
+  for (let index = 0; index < quickPreviewPlan.ids.length; index += 1) {
+    const id = quickPreviewPlan.ids[index];
+    const sectionCapture = await fetchCaptureMeta(id);
+    const card = document.createElement("article");
+    card.className = `continuous-preview-card${id === captureId ? " is-current" : ""}`;
+
+    const header = document.createElement("header");
+    const title = document.createElement("strong");
+    title.textContent = `${t(`第 ${index + 1} 段`)} · ${sectionCapture.source?.title || t("完整页面截图")}`;
+    const meta = document.createElement("span");
+    meta.textContent = `${formatCaptureUnit({
+      captureStrategy: sectionCapture.target?.captureStrategy,
+      pageCount: sectionCapture.target?.pageCount,
+      sliceCount: sectionCapture.slices?.length || 0
+    })} · ${Math.round((Number(sectionCapture.target?.totalHeight) || 0) / 100) / 10}k px`;
+    header.append(title, meta);
+
+    const canvas = id === captureId ? elements.canvas : document.createElement("canvas");
+    canvas.hidden = false;
+    canvas.setAttribute("aria-label", `${title.textContent}${t("低清完整预览")}`);
+    card.append(header, canvas);
+    elements.continuousPreview.appendChild(card);
+
+    try {
+      const previewInfo = await composeCaptureIntoQuickCanvas(sectionCapture, canvas, quickPreviewPlan.pixelBudgetPerSection);
+      if (id === captureId) {
+        canvasScale = previewInfo.canvasScale;
+        compositionInfo = previewInfo;
+        elements.previewEmptyState.hidden = true;
+      }
+    } catch (error) {
+      if (id === captureId) {
+        await composePreview();
+      } else {
+        card.classList.add("is-error");
+        meta.textContent = t("这一段暂时无法生成预览，可进入编辑工作台重试。");
+        reportHandledError(error);
+      }
+    }
+
+    updateLoadingMessage(
+      `正在准备连续截图完整预览 ${index + 1}/${quickPreviewPlan.ids.length}...`,
+      "快速结果使用轻量预览；编辑和导出仍会读取原始截图。",
+      (index + 1) / quickPreviewPlan.ids.length
+    );
+    await waitForPreviewPaint();
+  }
+}
+
+async function composeCaptureIntoQuickCanvas(sectionCapture, canvas, pixelBudget) {
+  const firstSlice = await fetchCaptureSlice(sectionCapture.id, 0);
+  const first = stripSliceData(firstSlice);
+  const firstImage = await loadImage(firstSlice.dataUrl);
+  const naturalScale = firstImage.naturalWidth / first.viewport.width;
+  const naturalWidth = Math.max(1, Math.round((sectionCapture.target?.visibleWidth || first.cropRect.width) * naturalScale));
+  const naturalHeight = Math.max(1, Math.round((sectionCapture.target?.totalHeight || first.targetVisibleHeight) * naturalScale));
+  const downscale = getPreviewDownscaleForBudget(naturalWidth, naturalHeight, pixelBudget);
+  const scale = naturalScale * downscale;
+  canvas.width = Math.max(1, Math.round((sectionCapture.target?.visibleWidth || first.cropRect.width) * scale));
+  canvas.height = Math.max(1, Math.round((sectionCapture.target?.totalHeight || first.targetVisibleHeight) * scale));
+  assertCanvasSize(canvas.width, canvas.height);
+
+  const context = canvas.getContext("2d", { alpha: false });
+  context.fillStyle = "#ffffff";
+  context.fillRect(0, 0, canvas.width, canvas.height);
+
+  for (let index = 0; index < sectionCapture.slices.length; index += 1) {
+    const sliceWithData = index === 0 ? firstSlice : await fetchCaptureSlice(sectionCapture.id, index);
+    const slice = stripSliceData(sliceWithData);
+    const image = index === 0 ? firstImage : await loadImage(sliceWithData.dataUrl);
+    const scaleX = image.naturalWidth / slice.viewport.width;
+    const scaleY = image.naturalHeight / slice.viewport.height;
+    context.drawImage(
+      image,
+      Math.round(slice.cropRect.x * scaleX),
+      Math.round(slice.cropRect.y * scaleY),
+      Math.round(slice.cropRect.width * scaleX),
+      Math.round(Math.min(slice.cropRect.height, slice.targetVisibleHeight) * scaleY),
+      0,
+      Math.round(slice.scrollTop * scale),
+      Math.round(slice.cropRect.width * scale),
+      Math.round(Math.min(slice.cropRect.height, slice.targetVisibleHeight) * scale)
+    );
+  }
+
+  return {
+    naturalCanvasScale: naturalScale,
+    naturalWidth,
+    naturalHeight,
+    width: canvas.width,
+    height: canvas.height,
+    downscale,
+    canvasScale: scale
+  };
+}
+
+function getPreviewDownscaleForBudget(width, height, pixelBudget) {
+  const safeBudget = Math.max(250_000, Number(pixelBudget) || 8_000_000);
+  const pixelScale = width * height > safeBudget ? Math.sqrt(safeBudget / (width * height)) : 1;
+  const sideScale = Math.min(1, MAX_CANVAS_SIDE / Math.max(width, height));
+  return Math.min(1, pixelScale, sideScale);
 }
 
 async function clearAllCaptureCaches() {
-  const ok = window.confirm("清空所有截图缓存？当前页面未刷新前仍可继续导出，但历史结果页将无法恢复原始截图。");
+  const ok = window.confirm(t("清空所有截图缓存？清空后当前预览仍可查看，但当前页不能再次高清导出，历史结果页也无法恢复原始截图。"));
   if (!ok) {
     return;
   }
@@ -1162,6 +1497,7 @@ async function clearAllCaptureCaches() {
     hasDeletedCaptureCache = true;
   }
   await refreshCaptureCacheList();
+  enforceDeletedCaptureState();
   setStatus("所有截图缓存已清空。");
 }
 
@@ -1198,15 +1534,18 @@ async function composePreview() {
     downscale
   };
 
+  elements.canvas.hidden = true;
   elements.canvas.width = width;
   elements.canvas.height = height;
 
-  const context = elements.canvas.getContext("2d", { alpha: false, willReadFrequently: true });
+  const context = elements.canvas.getContext("2d", { alpha: false });
   context.fillStyle = "#ffffff";
   context.fillRect(0, 0, width, height);
 
+  let prefetchedSlice = null;
   for (let index = 0; index < capture.slices.length; index += 1) {
-    const sliceWithData = index === 0 ? firstSlice : await fetchSlice(index);
+    const sliceWithData = index === 0 ? firstSlice : await prefetchedSlice;
+    prefetchedSlice = index + 1 < capture.slices.length ? fetchSlice(index + 1) : null;
     const slice = stripSliceData(sliceWithData);
     const image = index === 0 ? firstImage : await loadImage(sliceWithData.dataUrl);
     const scaleX = image.naturalWidth / slice.viewport.width;
@@ -1221,10 +1560,27 @@ async function composePreview() {
     const dh = Math.round(Math.min(slice.cropRect.height, slice.targetVisibleHeight) * canvasScale);
 
     context.drawImage(image, sx, sy, sw, sh, dx, dy, dw, dh);
-    const message = `正在拼接截图切片 ${index + 1}/${capture.slices.length}...${formatCompositionSizeNote()}`;
-    updateLoadingMessage(message, "内容越长，首次预览需要的拼接时间越久；最终导出仍会使用原始切片。");
+    const completed = index + 1;
+    const message = `正在拼接截图切片 ${completed}/${capture.slices.length}...${formatCompositionSizeNote()}`;
+    updateLoadingMessage(
+      message,
+      "预览正在逐段出现；最终导出仍会使用原始切片。",
+      completed / capture.slices.length
+    );
     setStatus(message);
+    if (index === 0) {
+      elements.canvas.hidden = false;
+      elements.previewEmptyState.hidden = true;
+      fitPreviewWidth({ silent: true, onlyIfOverflowing: true });
+    }
+    if (index === 0 || completed === capture.slices.length || completed % 4 === 0) {
+      await waitForPreviewPaint();
+    }
   }
+}
+
+function waitForPreviewPaint() {
+  return new Promise((resolve) => setTimeout(resolve, 0));
 }
 
 async function fetchSlice(index) {
@@ -1276,7 +1632,7 @@ function formatCompositionSizeNote() {
   }
   const naturalMp = Math.round((compositionInfo.naturalWidth * compositionInfo.naturalHeight) / 1_000_000);
   const previewMp = Math.round((compositionInfo.width * compositionInfo.height) / 1_000_000);
-  return ` 超长页面已自动缩放到 ${Math.round(compositionInfo.downscale * 100)}% 预览（原始约 ${naturalMp}MP，当前约 ${previewMp}MP）；预览模糊属正常，分页导出会使用原始切片。`;
+  return t(` 超长页面已自动缩放到 ${Math.round(compositionInfo.downscale * 100)}% 预览（原始约 ${naturalMp}MP，当前约 ${previewMp}MP）；预览模糊属正常，导出会重新读取原始切片。`);
 }
 
 function getPreviewScaleFromInput() {
@@ -1326,11 +1682,12 @@ function assertCanvasSize(width, height) {
 async function downloadEditedCanvas(type, extension, quality) {
   try {
     setBusy(true, `正在生成 ${extension.toUpperCase()}...`, "正在按当前选区渲染导出图片。");
-    const canvas = getEditedCanvas();
+    const exportState = getHighResExportState();
+    const canvas = await renderHighResCanvasSlice(exportState, 0, exportState.outputHeight);
     const blob = await canvasToBlob(canvas, type, quality);
     downloadBlob(blob, `${baseFilename()}.${extension}`);
-    const cleaned = await maybeAutoDeleteCurrentCaptureCache();
-    setStatus(cleaned ? `${extension.toUpperCase()} 已交给浏览器下载，并已删除本次缓存。` : `${extension.toUpperCase()} 已交给浏览器下载。`);
+    const cleanup = await maybeAutoDeleteCurrentCaptureCache();
+    setStatus(formatExportCompletionStatus(`${extension.toUpperCase()} 已交给浏览器下载。`, cleanup));
   } catch (error) {
     reportHandledError(error);
     setStatus(error.message || String(error), true);
@@ -1387,12 +1744,12 @@ async function buildPdfBytes() {
 async function exportMergedSectionsPdf() {
   const ids = sectionMergeOrder.filter((id) => selectedSectionIds.has(id));
   if (!ids.length) {
-    setStatus("请先选择要合并的截图节。", true);
+    setStatus("请至少选择两个截图段。", true);
     return;
   }
 
   const mergeMode = "draft";
-  setBusy(true, "正在准备分节合并 PDF...", "正在读取已选分节和各自的编辑草稿。");
+  setBusy(true, "正在准备多段 PDF...", "正在读取连续截图和各自的编辑草稿。");
   try {
     const pdfBytes = await buildMergedSectionsPdfBytes(ids, { mergeMode });
     downloadBlob(new Blob([pdfBytes], { type: "application/pdf" }), `${sectionMergeFilename()}-merged.pdf`);
@@ -1428,9 +1785,9 @@ async function buildMergedSectionsPdfBytes(ids, options = {}) {
         ? `S${section.sectionIndex + 1}  ${pageNumber}/${totalPages}  ${formatDateTime(section.sectionCapture.capturedAt)}`
         : "";
       addCanvasPageToPdf(pdf, pageCanvas, section.exportState.outputWidth, footer);
-      const stateLabel = options.mergeMode === "draft" && !section.hasEditorState ? "，该节未找到草稿，使用完整范围" : "";
-      const message = `正在合并第 ${section.sectionIndex + 1}/${sections.length} 节，PDF 第 ${pageNumber}/${totalPages} 页${stateLabel}...`;
-      updateLoadingMessage(message, "正在读取分节原始切片并写入合并 PDF。");
+      const stateLabel = options.mergeMode === "draft" && !section.hasEditorState ? "，该段未找到草稿，使用完整范围" : "";
+      const message = `正在合并第 ${section.sectionIndex + 1}/${sections.length} 段，PDF 第 ${pageNumber}/${totalPages} 页${stateLabel}...`;
+      updateLoadingMessage(message, "正在读取各段原始切片并写入 PDF。");
       setStatus(message);
     }
   }
@@ -1515,31 +1872,6 @@ function addCanvasPageToPdf(pdf, pageCanvas, sourceWidth, footer = "") {
     height: drawnHeightPt,
     footer
   });
-}
-
-function getEditedCanvas() {
-  const sourceCanvas = elements.canvas;
-  const crop = getActiveCropRect();
-  const scale = getExportScale();
-  const width = Math.max(1, Math.round(crop.width * scale));
-  const height = Math.max(1, Math.round(crop.height * scale));
-
-  assertCanvasSize(width, height);
-
-  if (scale === 1 && isFullCanvasCrop(crop)) {
-    return sourceCanvas;
-  }
-
-  const editedCanvas = document.createElement("canvas");
-  editedCanvas.width = width;
-  editedCanvas.height = height;
-  const context = editedCanvas.getContext("2d", { alpha: false, willReadFrequently: true });
-  context.fillStyle = "#ffffff";
-  context.fillRect(0, 0, width, height);
-  context.imageSmoothingEnabled = true;
-  context.imageSmoothingQuality = "high";
-  context.drawImage(sourceCanvas, crop.x, crop.y, crop.width, crop.height, 0, 0, width, height);
-  return editedCanvas;
 }
 
 function getHighResExportState() {
@@ -1993,6 +2325,9 @@ function deleteSelectedManualCutFromKeyboardOrButton() {
 }
 
 function handlePaginationKeydown(event) {
+  if (document.body.dataset.mode !== "editor") {
+    return;
+  }
   if (
     event.defaultPrevented
     || event.repeat
@@ -2338,15 +2673,15 @@ function updatePageRiskInfo(pdfRisk) {
 function buildPdfRiskSummary(pdfRisk) {
   const messages = pdfRisk.items
     .slice(0, PDF_RISK_MESSAGE_LIMIT)
-    .map((item) => item.message);
+    .map((item) => t(item.message));
   const remaining = pdfRisk.items.length > PDF_RISK_MESSAGE_LIMIT
-    ? ` 另有 ${pdfRisk.items.length - PDF_RISK_MESSAGE_LIMIT} 页也偏离参考区。`
+    ? t(` 另有 ${pdfRisk.items.length - PDF_RISK_MESSAGE_LIMIT} 页也偏离参考区。`)
     : "";
-  return `${messages.join(" ")}${remaining} 建议先导出分页 PNG ZIP，再用图片合并 PDF，可避开直接 PDF 的缩放变形风险。`;
+  return `${messages.join(" ")}${remaining} ${t("建议先导出分页 PNG ZIP，再用图片合并 PDF，可避开直接 PDF 的缩放变形风险。")}`;
 }
 
 function buildPdfRiskConfirmMessage(pdfRisk) {
-  return `${buildPdfRiskSummary(pdfRisk)}\n\n仍然直接导出分页 PDF？`;
+  return `${buildPdfRiskSummary(pdfRisk)}\n\n${t("仍然直接导出分页 PDF？")}`;
 }
 
 function getCurrentPdfRiskAnalysis() {
@@ -2775,7 +3110,7 @@ function footerText(page, total) {
 }
 
 function formatDateTime(value) {
-  return new Date(value).toLocaleString("zh-CN", {
+  return new Date(value).toLocaleString(globalThis.XFI18n?.localeForIntl?.() || "zh-CN", {
     year: "numeric",
     month: "numeric",
     day: "numeric",
@@ -2959,6 +3294,8 @@ function crc32(bytes) {
 
 function setBusy(isBusy, message, detail = "") {
   setExportControlsEnabled(!isBusy);
+  elements.toggleEditorMode.disabled = isBusy;
+  enforceDeletedCaptureState();
   if (message) {
     setStatus(message);
   }
@@ -2967,6 +3304,20 @@ function setBusy(isBusy, message, detail = "") {
   } else {
     hideLoadingOverlay();
   }
+}
+
+function enforceDeletedCaptureState() {
+  if (!hasDeletedCaptureCache) {
+    return;
+  }
+  for (const button of [elements.savePng, elements.savePagedPng, elements.saveJpeg, elements.savePagedJpeg, elements.savePdf, elements.refreshSections, elements.openMergeEditor, elements.moveSectionUp, elements.moveSectionDown]) {
+    if (button) {
+      button.disabled = true;
+    }
+  }
+  elements.toggleEditorMode.disabled = true;
+  updateSegmentControls();
+  updateCacheControls();
 }
 
 function setExportControlsEnabled(enabled) {
@@ -2978,11 +3329,15 @@ function setExportControlsEnabled(enabled) {
       button.disabled = !enabled;
     }
   }
+  const sourceActionState = capture ? resultWorkflow.getSourceActionState(capture) : null;
+  if (elements.openSourceOriginal) {
+    elements.openSourceOriginal.disabled = !enabled || !sourceActionState?.canReturn;
+  }
   if (elements.openSourceAtEnd) {
-    elements.openSourceAtEnd.disabled = !enabled || !hasSegmentResumePosition(capture?.segment);
+    elements.openSourceAtEnd.disabled = !enabled || !sourceActionState?.canReturnToSavedEnd || hasDeletedCaptureCache;
   }
   if (elements.startSourceAtEnd) {
-    elements.startSourceAtEnd.disabled = !enabled || !hasSegmentResumePosition(capture?.segment);
+    elements.startSourceAtEnd.disabled = !enabled || !sourceActionState?.canContinue || hasDeletedCaptureCache;
   }
   if (enabled) {
     updatePaginationControls();
@@ -2999,7 +3354,7 @@ function setStatus(message, isError = false) {
   elements.status.style.color = isError ? "#b42318" : "";
 }
 
-function updateLoadingMessage(title, detail = "") {
+function updateLoadingMessage(title, detail = "", progress = null) {
   if (!elements.loadingOverlay) {
     return;
   }
@@ -3008,6 +3363,40 @@ function updateLoadingMessage(title, detail = "") {
   elements.loadingOverlay.classList.add("is-visible");
   elements.loadingTitle.textContent = title || "正在处理...";
   elements.loadingDetail.textContent = detail || "长图处理可能需要一点时间，请稍等。";
+  const hasProgress = Number.isFinite(progress);
+  elements.loadingRunner?.classList.toggle("is-determinate", hasProgress);
+  if (hasProgress) {
+    const percentage = `${Math.round(clamp(progress, 0, 1) * 100)}%`;
+    elements.loadingRunner.style.setProperty("--loading-progress", percentage);
+    elements.loadingRunner.setAttribute("aria-valuenow", String(Math.round(clamp(progress, 0, 1) * 100)));
+  } else {
+    elements.loadingRunner?.style.removeProperty("--loading-progress");
+    elements.loadingRunner?.removeAttribute("aria-valuenow");
+  }
+}
+
+function updateQuickDraftNotice() {
+  if (!elements.quickDraftNotice) {
+    return;
+  }
+  elements.quickDraftNotice.hidden = document.body.dataset.mode !== "quick" || !hasProtectableEditorWork();
+}
+
+function showPreviewError() {
+  if (!elements.previewEmptyState) {
+    return;
+  }
+  elements.canvas.hidden = true;
+  elements.previewEmptyState.hidden = false;
+  elements.previewEmptyState.classList.add("is-error");
+  const title = elements.previewEmptyState.querySelector("strong");
+  const detail = elements.previewEmptyState.querySelector("span:last-child");
+  if (title) {
+    title.textContent = "预览暂时无法打开";
+  }
+  if (detail) {
+    detail.textContent = "截图数据读取失败。可返回原页面重新截取，或稍后重试。";
+  }
 }
 
 function hideLoadingOverlay() {
@@ -3021,7 +3410,7 @@ function hideLoadingOverlay() {
 
 function reportHandledError(error) {
   if (console.debug) {
-    console.debug("Handled XF FullPage Capture error:", error);
+    console.debug("Handled ScrollCatch error:", error);
   }
 }
 

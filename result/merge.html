@@ -1,33 +1,37 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="en">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>XF FullPage Capture Merge Editor</title>
+    <title>ScrollCatch 编辑工作台</title>
     <link rel="stylesheet" href="./merge.css">
   </head>
-  <body>
+  <body data-precision-open="false" data-default-tool="pagination">
     <header class="app-bar">
-      <div>
-        <p class="eyebrow">XF FullPage Capture Sections</p>
-        <h1>分节合并编辑器</h1>
-        <p id="meta" class="meta">正在读取分节截图...</p>
+      <div class="brand-lockup">
+        <img class="brand-icon" src="../icons/icon-48.png" alt="">
+        <div>
+          <p class="eyebrow">ScrollCatch</p>
+          <h1>编辑工作台</h1>
+        </div>
       </div>
-      <div class="actions">
-        <button id="exportPagedPng" type="button" disabled>分页 PNG</button>
-        <button id="exportPagedJpeg" type="button" disabled>分页 JPEG</button>
-        <button id="backToResult" type="button">返回结果页</button>
-        <button id="exportPdf" type="button" disabled>合并 PDF</button>
-      </div>
-    </header>
 
-    <main class="merge-workspace">
-      <aside class="panel">
-        <section class="panel-section">
-          <h2>全局导出</h2>
-          <p class="hint-text warning-text">合并编辑器主要用于同一篇文章分多节截取后的统一分页和导出。一次性截完时，直接在结果页导出即可，通常不用进入这里。</p>
-          <details class="advanced-settings">
-            <summary>高级 PDF 参数</summary>
+      <div class="header-actions">
+        <button id="backToResult" class="secondary-action" type="button">返回快速结果</button>
+        <label class="locale-control">
+          <span class="locale-label">界面语言</span>
+          <select data-locale-select data-i18n-ignore aria-label="界面语言">
+            <option value="en">English</option>
+            <option value="zh-CN">中文</option>
+          </select>
+        </label>
+        <details id="exportSettings" class="header-export-settings">
+          <summary>导出设置</summary>
+          <div class="header-export-popover">
+            <div class="mini-actions">
+              <button id="exportPagedPng" type="button" disabled>分页 PNG</button>
+              <button id="exportPagedJpeg" type="button" disabled>分页 JPEG</button>
+            </div>
             <label>
               纸张
               <select id="paper">
@@ -51,138 +55,214 @@
               <input id="includeMeta" type="checkbox" checked>
               页脚显示页码和时间
             </label>
-          </details>
-        </section>
+          </div>
+        </details>
+        <button id="openExportMode" class="primary-action" type="button">导出 PDF</button>
+      </div>
+    </header>
 
-        <section class="panel-section">
-          <h2>视图</h2>
-          <p class="hint-text warning-text">如果截取画面过多，内容预览会比较慢，请耐心等待。分节合并编辑器处理多节长图时可能会短暂卡顿。</p>
-          <label>
-            预览缩放
-            <input id="previewZoom" type="range" min="0.15" max="1" step="0.05" value="0.5">
-            <span id="previewZoomValue" class="value-readout">50%</span>
-          </label>
-          <label>
-            布局
-            <select id="previewLayout">
-              <option value="double">双列对比</option>
-              <option value="single">单列浏览</option>
-              <option value="auto">自动排列</option>
-            </select>
-          </label>
-          <button id="fitWidth" class="wide-action" type="button" disabled>适配当前宽度</button>
-        </section>
+    <div class="workspace-meta-strip">
+      <p id="meta" class="meta">正在整理连续截图...</p>
+      <p id="status" class="status" aria-live="polite">初始化中...</p>
+      <p class="autosave-state">已自动保存</p>
+    </div>
 
-        <section class="panel-section">
-          <h2>分节</h2>
-          <label>
-            当前调整节
-            <select id="activeSection"></select>
-          </label>
+    <main class="merge-workspace">
+      <aside id="sectionRail" class="section-rail">
+        <div class="rail-heading">
+          <h2>分段</h2>
+          <button id="toggleSectionRail" class="compact-action" type="button" aria-label="折叠分段栏" title="折叠分段栏">收起</button>
+        </div>
+        <label class="active-section-select">
+          当前编辑段
+          <select id="activeSection"></select>
+        </label>
+        <button id="openCaptureManager" class="section-manager-entry" type="button">
+          <strong>管理与排序</strong>
+          <span>添加截图、调整组合顺序</span>
+        </button>
+        <div id="sectionList" class="section-list" aria-live="polite"></div>
+        <div class="rail-actions">
+          <button id="moveUp" type="button" disabled>上移当前段</button>
+          <button id="moveDown" type="button" disabled>下移当前段</button>
+        </div>
+        <section class="rail-cache-card" aria-labelledby="railCacheTitle">
+          <div class="rail-cache-heading">
+            <strong id="railCacheTitle">截图缓存</strong>
+            <button id="refreshCacheUsage" class="rail-cache-refresh" type="button" disabled>刷新大小</button>
+          </div>
+          <p id="cacheUsage" class="rail-cache-usage">正在读取缓存大小...</p>
+          <p id="cacheRetentionNote" class="cache-retention-note">缓存保存在浏览器本机。导出后只清理本次导出的分段，其他历史截图仍会保留。</p>
+          <div class="rail-cache-actions">
+            <button id="deleteSelectedCaches" type="button" disabled>清理当前组合</button>
+            <button id="deleteOtherCaptureCaches" type="button" disabled>清理历史缓存</button>
+          </div>
+        </section>
+        <details class="capture-manager">
+          <summary>添加或排除截图</summary>
+          <p id="capturePickerInfo" class="hint-text">自动续截会直接进入当前组合；历史截图和独立 PPT 截图可在这里添加或排除。</p>
           <div class="mini-actions">
-            <button id="moveUp" type="button" disabled>上移</button>
-            <button id="moveDown" type="button" disabled>下移</button>
+            <button id="refreshCaptureOptions" type="button" disabled>刷新列表</button>
+            <button id="applyCaptureSelection" type="button" disabled>应用组合</button>
           </div>
-          <button id="applyActiveToAll" class="wide-action" type="button" disabled>套用当前节参数到全部</button>
-          <div id="sectionList" class="section-list" aria-live="polite"></div>
-        </section>
-
-        <section class="panel-section">
-          <h2>选区</h2>
-          <label class="check-row">
-            <input id="enableCrop" type="checkbox">
-            使用选区导出
-          </label>
-          <div class="field-grid" aria-label="裁切区域">
-            <label>
-              X
-              <input id="cropX" type="number" min="0" step="1" value="0">
-            </label>
-            <label>
-              Y
-              <input id="cropY" type="number" min="0" step="1" value="0">
-            </label>
-            <label>
-              宽
-              <input id="cropWidth" type="number" min="1" step="1" value="1">
-            </label>
-            <label>
-              高
-              <input id="cropHeight" type="number" min="1" step="1" value="1">
-            </label>
-          </div>
-          <details class="advanced-settings">
-            <summary>高级导出清晰度</summary>
-            <label>
-              导出清晰度
-              <input id="exportScale" type="range" min="0.5" max="2" step="0.05" value="1">
-              <span id="exportScaleValue" class="value-readout">100%</span>
-            </label>
-          </details>
-          <div class="mini-actions">
-            <button id="cropFull" type="button" disabled>全图</button>
-            <button id="cropVisible" type="button" disabled>当前视图</button>
-          </div>
-        </section>
-
-        <section class="panel-section">
-          <h2>自定义分页</h2>
-          <label class="check-row">
-            <input id="customPagination" type="checkbox">
-            使用自定义分页线
-          </label>
-          <label>
-            页面范围
-            <select id="pageRangeMode">
-              <option value="all">显示全部 PDF 参考区</option>
-              <option value="selected">只看选中分页线</option>
-              <option value="off">隐藏页面范围</option>
-            </select>
-          </label>
-          <p id="pageRiskInfo" class="hint-text page-risk-info">开启自定义分页线后，预览里会显示 PDF 参考区。</p>
-          <div class="mini-actions">
-            <button id="seedPageCuts" type="button" disabled>按纸张生成</button>
-            <button id="addPageCut" type="button" aria-keyshortcuts="A + =" disabled>新增分页线</button>
-          </div>
-          <div class="mini-actions">
-            <button id="deletePageCut" type="button" aria-keyshortcuts="Delete Backspace" disabled>删除选中线</button>
-            <button id="clearPageCuts" type="button" disabled>清除分页线</button>
-          </div>
-          <p id="paginationShortcutHint" class="hint-text shortcut-hint pagination-shortcut-hint">开启自定义分页线后可用：A / + / = 新增分页线；Delete / Backspace 删除选中线。</p>
-          <p id="pageCutList" class="hint-text">自动分页。</p>
-        </section>
-
-        <section class="panel-section">
-          <h2>缓存</h2>
-          <p id="cacheUsage" class="hint-text">正在读取缓存大小...</p>
-          <label class="check-row">
-            <input id="autoClearAfterExport" type="checkbox">
-            导出后自动清理本次分节缓存
-          </label>
-          <div class="mini-actions">
-            <button id="refreshCacheUsage" type="button" disabled>刷新大小</button>
-            <button id="deleteSelectedCaches" type="button" disabled>清理本次分节</button>
-          </div>
-        </section>
-
-        <p id="status" class="status">初始化中...</p>
+          <div id="capturePickerList" class="capture-picker-list" aria-live="polite"></div>
+        </details>
       </aside>
 
-      <section class="preview-area" aria-label="Section previews">
-        <div id="sectionGrid" class="section-grid"></div>
+      <section id="canvasWorkspace" class="canvas-workspace">
+        <section class="preview-area" aria-label="Section previews">
+          <p class="preview-quality-note"><strong>预览提示</strong><span>为保证编辑流畅，当前预览模糊属正常；导出仍使用原始截图，不影响最终清晰度。</span></p>
+          <div id="sectionGrid" class="section-grid"></div>
+        </section>
+
+        <div id="coreTools" class="core-tools" aria-label="工作台核心工具">
+          <section class="tool-group" data-tool-group="crop">
+            <div class="tool-group-heading">
+              <div class="tool-group-copy">
+                <strong>自由裁切</strong>
+                <small>拖动边框自由选择范围；“只留当前画面”仅保留预览区此刻看到的部分。</small>
+              </div>
+              <p id="cropSummary" class="crop-summary tool-inline-status" aria-live="polite">当前裁切：全图</p>
+            </div>
+            <button id="cropFull" class="action-feedback" type="button" disabled>
+              <span>恢复全图</span>
+              <img class="action-state-icon" src="../icons/ui/check.svg" alt="">
+            </button>
+            <button id="cropVisible" class="action-feedback" type="button" disabled>
+              <span>只留当前画面</span>
+              <img class="action-state-icon" src="../icons/ui/check.svg" alt="">
+            </button>
+            <label class="toggle-action" for="enableCrop">
+              <input id="enableCrop" type="checkbox" checked>
+              <span>启用自由裁切</span>
+            </label>
+            <button id="openPrecisionPanel" type="button" aria-controls="precisionPanel" aria-expanded="false">精确数值</button>
+            <button id="applyActiveToAll" class="primary-action action-feedback" type="button" disabled>
+              <span>同步应用到全部</span>
+              <img class="action-state-icon" src="../icons/ui/check.svg" alt="">
+            </button>
+
+            <aside id="precisionPanel" class="precision-panel" role="dialog" aria-labelledby="precisionPanelTitle" hidden>
+              <div class="precision-panel-heading">
+                <div>
+                  <p class="eyebrow">精细修剪</p>
+                  <h2 id="precisionPanelTitle">精确数值</h2>
+                </div>
+                <button id="closePrecisionPanel" class="compact-action" type="button" aria-label="关闭精细修剪">关闭</button>
+              </div>
+              <p class="hint-text">数值会跟随当前裁切框更新；输入后也会立即反映到截图上。</p>
+              <div class="field-grid" aria-label="裁切区域">
+                <label>
+                  X
+                  <input id="cropX" type="number" min="0" step="1" value="0">
+                </label>
+                <label>
+                  Y
+                  <input id="cropY" type="number" min="0" step="1" value="0">
+                </label>
+                <label>
+                  宽
+                  <input id="cropWidth" type="number" min="1" step="1" value="1">
+                </label>
+                <label>
+                  高
+                  <input id="cropHeight" type="number" min="1" step="1" value="1">
+                </label>
+              </div>
+              <label>
+                导出清晰度
+                <input id="exportScale" type="range" min="0.5" max="2" step="0.05" value="1">
+                <span id="exportScaleValue" class="value-readout">100%</span>
+              </label>
+              <p class="quality-assurance">高清导出使用原始截图</p>
+            </aside>
+          </section>
+
+          <section class="tool-group" data-tool-group="pagination">
+            <div class="tool-group-heading">
+              <div class="tool-group-copy">
+                <strong>自定义分页线</strong>
+                <small>直接新增、拖动或删除 PDF 分页位置。</small>
+              </div>
+              <div class="tool-inline-status-group">
+                <p id="pageRiskInfo" class="hint-text page-risk-info">开启后显示 PDF 参考区。</p>
+                <p id="pageCutList" class="hint-text page-cut-summary">自动分页。</p>
+              </div>
+            </div>
+            <label class="toggle-action" for="customPagination">
+              <input id="customPagination" type="checkbox" checked>
+              <span>使用自定义分页线</span>
+            </label>
+            <button id="seedPageCuts" class="action-feedback" type="button" disabled>
+              <span>按纸张生成</span>
+              <img class="action-state-icon" src="../icons/ui/check.svg" alt="">
+            </button>
+            <button id="addPageCut" class="action-feedback" type="button" aria-keyshortcuts="A + =" disabled>
+              <span>新增分页线</span>
+              <img class="action-state-icon" src="../icons/ui/check.svg" alt="">
+            </button>
+            <button id="deletePageCut" class="action-feedback" type="button" aria-keyshortcuts="Delete Backspace" disabled>
+              <span>删除选中线</span>
+              <img class="action-state-icon" src="../icons/ui/check.svg" alt="">
+            </button>
+            <button id="clearPageCuts" class="action-feedback" type="button" disabled>
+              <span>清除分页线</span>
+              <img class="action-state-icon" src="../icons/ui/check.svg" alt="">
+            </button>
+            <div class="shortcut-card" aria-label="分页快捷键" title="分页快捷键">
+              <span><kbd>A</kbd> / <kbd>+</kbd> 新增</span>
+              <span><kbd>Delete</kbd> 删除选中线</span>
+            </div>
+            <p id="paginationShortcutHint" class="hint-text shortcut-hint pagination-shortcut-hint">可拖动分页线；A / + 新增；Delete 删除选中线。</p>
+          </section>
+
+          <section class="tool-group export-panel" data-tool-group="export">
+            <div class="tool-group-heading">
+              <div class="tool-group-copy">
+                <strong>导出</strong>
+                <small>按左侧顺序合并全部保留分段。</small>
+              </div>
+            </div>
+            <label class="check-row sync-export-option">
+              <input id="syncBeforeExport" type="checkbox" checked>
+              同步全部设置
+            </label>
+            <label class="check-row export-cleanup-option">
+              <input id="autoClearAfterExport" type="checkbox" checked>
+              导出后清理本次组合缓存
+            </label>
+          </section>
+        </div>
+
       </section>
     </main>
+
+    <section id="exportCompletePanel" class="export-complete-panel" role="dialog" aria-modal="true" aria-labelledby="exportCompleteTitle" hidden>
+      <div class="export-complete-card">
+        <img class="export-complete-icon" src="../icons/icon-48.png" alt="">
+        <p class="eyebrow">导出完成</p>
+        <h2 id="exportCompleteTitle">PDF 已保存</h2>
+        <p id="exportCompleteDetail">截图缓存已清理，本工作台将不再支持二次编辑。你可以直接返回原文。</p>
+        <div class="export-complete-actions">
+          <button id="returnToSourceAfterExport" class="primary-action" type="button">返回原文</button>
+          <button id="backToResultAfterExport" type="button">返回快速结果</button>
+          <button id="closeAfterExport" type="button">关闭此页</button>
+        </div>
+      </div>
+    </section>
 
     <div id="loadingOverlay" class="loading-overlay" role="status" aria-live="polite">
       <div class="loading-card">
         <div class="loading-runner" aria-hidden="true"></div>
         <div>
-          <p id="loadingTitle" class="loading-title">正在加载分节截图...</p>
+          <p id="loadingTitle" class="loading-title">正在加载连续截图...</p>
           <p id="loadingDetail" class="loading-detail">长图预览需要读取多张切片，请稍等，不影响最终导出清晰度。</p>
         </div>
       </div>
     </div>
 
+    <script src="../shared/i18n.js"></script>
+    <script src="./workbench-utils.js"></script>
     <script src="./merge.js"></script>
   </body>
 </html>

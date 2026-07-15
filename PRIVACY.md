@@ -1,12 +1,12 @@
-# XF FullPage Capture Privacy Policy
+# ScrollCatch — Full Page Capture Privacy Policy
 
-Last updated: 2026-06-11
+Last updated: 2026-07-15
 
-This policy applies to XF FullPage Capture and XF FullPage Capture Sections.
+This policy applies to ScrollCatch — Full Page Capture (formerly XF FullPage Capture).
 
 ## Summary
 
-XF FullPage Capture is a local-first browser extension for capturing, cropping, paginating, and exporting web page screenshots. It does not create accounts, does not run analytics, does not show ads, and does not upload screenshots or page content to any external server.
+ScrollCatch is a local-first browser extension for capturing, cropping, paginating, and exporting web page screenshots. It does not create accounts, does not run analytics, does not show ads, and does not upload screenshots or page content to any external server.
 
 ## Data handled by the extension
 
@@ -45,7 +45,7 @@ Exported files are created locally and handed to the browser download flow. Afte
 
 ## Third parties
 
-XF FullPage Capture does not include third-party analytics, advertising SDKs, tracking pixels, remote code loaders, or server-side processing services.
+ScrollCatch does not include third-party analytics, advertising SDKs, tracking pixels, remote code loaders, or server-side processing services.
 
 ## Permissions
 
@@ -80,15 +80,15 @@ https://github.com/Yifo98/XF-FullPage-Capture/issues
 
 ---
 
-# XF FullPage Capture 隐私政策
+# ScrollCatch — Full Page Capture 隐私政策
 
-最后更新：2026-06-11
+最后更新：2026-07-15
 
-本政策适用于 XF FullPage Capture 和 XF FullPage Capture Sections。
+本政策适用于 ScrollCatch — Full Page Capture（原 XF FullPage Capture）。
 
 ## 概要
 
-XF FullPage Capture 是一个本地优先的浏览器扩展，用于网页截图、裁切、分页、分节合并和导出。扩展不提供账号系统，不运行统计分析，不展示广告，也不会把截图或网页内容上传到外部服务器。
+ScrollCatch 是一个本地优先的浏览器扩展，用于网页截图、裁切、分页、分节合并和导出。扩展不提供账号系统，不运行统计分析，不展示广告，也不会把截图或网页内容上传到外部服务器。
 
 ## 扩展会处理哪些数据
 
@@ -127,7 +127,7 @@ XF FullPage Capture 是一个本地优先的浏览器扩展，用于网页截图
 
 ## 第三方
 
-XF FullPage Capture 不包含第三方统计、广告 SDK、追踪像素、远程代码加载器或服务器端处理服务。
+ScrollCatch 不包含第三方统计、广告 SDK、追踪像素、远程代码加载器或服务器端处理服务。
 
 ## 权限说明
 

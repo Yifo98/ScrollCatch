@@ -3,3 +3,8 @@
 dist/
 tmp/
 *.log
+output/
+outputs/*
+!outputs/*.md
+design-qa.md
+.playwright-cli/

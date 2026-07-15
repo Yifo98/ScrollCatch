@@ -1,11 +1,33 @@
 (() => {
-  const VERSION = "0.3.9";
+  const VERSION = "0.4.0";
   const SCROLL_STRIDE_RATIO = 0.96;
   const STABILITY_SAMPLE_MS = 95;
   const DOCUMENT_STABILITY_SAMPLE_MS = 145;
   const PAGE_CONTENT_READY_TIMEOUT_MS = 1200;
   const DOCUMENT_CONTENT_READY_TIMEOUT_MS = 1800;
   const PRESENTATION_CONTENT_READY_TIMEOUT_MS = 2600;
+  const LOCALE_STORAGE_KEY = "xfFullPageCapture:locale";
+  let interfaceLocale = "en";
+
+  function normalizeInterfaceLocale(value) {
+    return /^zh(?:-|$)/i.test(value || "") ? "zh-CN" : "en";
+  }
+
+  const interfaceLocaleReady = Promise.resolve(chrome.storage?.local?.get?.(LOCALE_STORAGE_KEY))
+    .then((stored) => {
+      interfaceLocale = normalizeInterfaceLocale(stored?.[LOCALE_STORAGE_KEY]);
+    })
+    .catch(() => {});
+
+  chrome.storage?.onChanged?.addListener?.((changes, areaName) => {
+    if (areaName === "local" && changes?.[LOCALE_STORAGE_KEY]) {
+      interfaceLocale = normalizeInterfaceLocale(changes[LOCALE_STORAGE_KEY].newValue);
+    }
+  });
+
+  function ui(zh, en) {
+    return interfaceLocale === "en" ? en : zh;
+  }
 
   if (window.__xfFullPageCaptureVersion === VERSION) {
     return;
@@ -24,10 +46,15 @@
     styleNode: null,
     hiddenNodes: new Map(),
     captureSessionId: "",
+    stopRequestSent: false,
     captureProfile: "default",
     targetInfo: null,
     stopKeyHandler: null,
-    startPickerCleanup: null
+    startPickerCleanup: null,
+    startPickerCancel: null,
+    startPickerRequested: false,
+    startPickerOpening: false,
+    startPickerCancelPending: false
   };
 
   function handleMessage(message, _sender, sendResponse) {
@@ -46,7 +73,9 @@
     }
 
     if (message?.type === "XF_PICK_CAPTURE_RANGE" || message?.type === "XF_PICK_START_POSITION") {
+      state.startPickerRequested = true;
       Promise.resolve().then(pickCaptureRange).then(sendResponse).catch((error) => {
+        state.startPickerRequested = false;
         sendResponse({ ok: false, error: error.message || String(error) });
       });
       return true;
@@ -82,6 +111,24 @@
 
     if (message?.type === "XF_RESTORE_CAPTURE") {
       restoreCapture();
+      sendResponse({ ok: true });
+      return true;
+    }
+
+    if (message?.type === "XF_ARM_CAPTURE_STOP") {
+      armCaptureStop(message.sessionId);
+      sendResponse({ ok: true });
+      return true;
+    }
+
+    if (message?.type === "XF_DISARM_CAPTURE_STOP") {
+      disarmCaptureStop(message.sessionId);
+      sendResponse({ ok: true });
+      return true;
+    }
+
+    if (message?.type === "XF_CANCEL_CAPTURE_RANGE") {
+      cancelStartPicker();
       sendResponse({ ok: true });
       return true;
     }
@@ -148,6 +195,7 @@
     document.documentElement.appendChild(state.styleNode);
 
     state.captureSessionId = options.sessionId || "";
+    state.stopRequestSent = false;
     if (options.enableKeyStop || options.enableClickStop) {
       installStopKeyListener();
     }
@@ -318,12 +366,21 @@
     state.originalTargetScrollBehavior = "";
     state.styleNode = null;
     state.captureSessionId = "";
+    state.stopRequestSent = false;
     state.captureProfile = "default";
     state.targetInfo = null;
   }
 
-  function pickCaptureRange() {
-    cancelStartPicker();
+  async function pickCaptureRange() {
+    resetStartPicker({ preservePendingCancel: true });
+    state.startPickerRequested = false;
+    state.startPickerOpening = true;
+    await interfaceLocaleReady;
+    state.startPickerOpening = false;
+    if (state.startPickerCancelPending) {
+      state.startPickerCancelPending = false;
+      return { ok: true, cancelled: true };
+    }
 
     const targetInfo = findBestScrollTarget();
     return new Promise((resolve) => {
@@ -331,6 +388,8 @@
       const controlsLayer = document.createElement("div");
       const line = document.createElement("div");
       const startLine = document.createElement("div");
+      const selectionBand = document.createElement("div");
+      const selectionSize = document.createElement("div");
       const label = document.createElement("div");
       const controls = document.createElement("div");
       const startButton = document.createElement("button");
@@ -339,6 +398,7 @@
       const cancelButton = document.createElement("button");
       let startScrollTop = null;
       let currentClientY = Math.round(window.innerHeight / 2);
+      let pickerFinished = false;
 
       overlay.id = "xf-fullpage-capture-start-picker";
       overlay.style.cssText = [
@@ -361,7 +421,7 @@
         "right: 0",
         "top: 50%",
         "height: 0",
-        "border-top: 2px solid #0f766e",
+        "border-top: 2px solid #0b5cff",
         "box-shadow: 0 0 0 1px rgba(255,255,255,0.72)"
       ].join(";");
       startLine.style.cssText = [
@@ -374,14 +434,38 @@
         "box-shadow: 0 0 0 1px rgba(255,255,255,0.72)",
         "display: none"
       ].join(";");
-      label.textContent = "移动鼠标定位，点击页面正文或“标记起点”；Esc 取消";
+      selectionBand.style.cssText = [
+        "position: fixed",
+        "display: none",
+        "z-index: -1",
+        "border: 1px solid rgba(11, 92, 255, 0.58)",
+        "background: rgba(11, 92, 255, 0.11)",
+        "box-shadow: inset 0 0 0 1px rgba(255,255,255,0.5)",
+        "pointer-events: none"
+      ].join(";");
+      selectionSize.style.cssText = [
+        "position: fixed",
+        "display: none",
+        "padding: 5px 8px",
+        "border: 1px solid rgba(11, 92, 255, 0.3)",
+        "border-radius: 6px",
+        "background: rgba(255, 255, 255, 0.96)",
+        "color: #17427a",
+        "font: 700 12px/1.25 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
+        "box-shadow: 0 6px 18px rgba(15, 23, 42, 0.16)",
+        "pointer-events: none"
+      ].join(";");
+      label.textContent = ui(
+        "移动鼠标定位，点击页面正文或“标记起点”；Esc 取消",
+        "Move the pointer, click the page or Mark start; press Esc to cancel"
+      );
       label.style.cssText = [
         "position: fixed",
         "right: 16px",
         "top: calc(50% + 10px)",
         "padding: 7px 10px",
         "border-radius: 7px",
-        "background: rgba(15, 118, 110, 0.94)",
+        "background: rgba(11, 92, 255, 0.96)",
         "color: #fff",
         "font: 12px/1.4 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
         "box-shadow: 0 8px 24px rgba(15, 23, 42, 0.24)"
@@ -392,7 +476,7 @@
         "gap: 8px",
         "max-width: min(520px, calc(100vw - 32px))",
         "padding: 10px",
-        "border: 1px solid rgba(15, 118, 110, 0.28)",
+        "border: 1px solid rgba(11, 92, 255, 0.28)",
         "border-radius: 8px",
         "background: rgba(255, 255, 255, 0.96)",
         "box-shadow: 0 12px 34px rgba(15, 23, 42, 0.22)",
@@ -402,10 +486,10 @@
         button.type = "button";
         button.style.cssText = [
           "min-height: 32px",
-          "border: 1px solid #0f766e",
+          "border: 1px solid #0b5cff",
           "border-radius: 7px",
           "padding: 0 10px",
-          "background: #0f766e",
+          "background: #0b5cff",
           "color: #fff",
           "font: 12px/1.2 -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif",
           "font-weight: 700",
@@ -413,17 +497,17 @@
         ].join(";");
         button.style.setProperty("pointer-events", "auto", "important");
       }
-      startButton.textContent = "标记起点";
-      endButton.textContent = "标记终点";
-      toEndButton.textContent = "截到页面结束";
-      cancelButton.textContent = "取消";
+      startButton.textContent = ui("标记起点", "Mark start");
+      endButton.textContent = ui("标记终点", "Mark end");
+      toEndButton.textContent = ui("截到页面结束", "Capture to page end");
+      cancelButton.textContent = ui("取消", "Cancel");
       endButton.disabled = true;
       toEndButton.disabled = true;
       cancelButton.style.background = "#fff";
-      cancelButton.style.color = "#0f766e";
+      cancelButton.style.color = "#0b5cff";
       controls.append(startButton, endButton, toEndButton, cancelButton);
       controlsLayer.appendChild(controls);
-      overlay.append(startLine, line, label);
+      overlay.append(selectionBand, startLine, line, label, selectionSize);
       document.documentElement.appendChild(overlay);
       document.documentElement.appendChild(controlsLayer);
 
@@ -434,7 +518,7 @@
       const cleanup = () => {
         document.removeEventListener("pointermove", onPointerMove, true);
         document.removeEventListener("pointerdown", onPagePointerDown, true);
-        document.removeEventListener("keydown", onKeydown, true);
+        window.removeEventListener("keydown", onKeydown, true);
         document.removeEventListener("scroll", updateStartLinePosition, true);
         controlsLayer.removeEventListener("pointerdown", stopControlEvent);
         controlsLayer.removeEventListener("pointerup", stopControlEvent);
@@ -448,9 +532,14 @@
         if (state.startPickerCleanup === cleanup) {
           state.startPickerCleanup = null;
         }
+        state.startPickerCancel = null;
       };
 
       const finish = (payload) => {
+        if (pickerFinished) {
+          return;
+        }
+        pickerFinished = true;
         cleanup();
         resolve(payload);
       };
@@ -471,7 +560,11 @@
         endButton.disabled = false;
         toEndButton.disabled = false;
         updateStartLinePosition();
-        label.textContent = "已标记起点。可以滚动页面，再点击页面正文或“标记终点”；按 Enter 截到页面结束，Esc 取消";
+        updateSelectionPreview();
+        label.textContent = ui(
+          "已标记起点。可以滚动页面，再点击页面正文或“标记终点”；按 Enter 截到页面结束，Esc 取消",
+          "Start marked. Scroll, then click the page or Mark end; press Enter to capture to the end or Esc to cancel"
+        );
       };
 
       const markEnd = (event) => {
@@ -479,12 +572,15 @@
 
         const pickedScrollTop = getPickedScrollTop(targetInfo, currentClientY);
         if (startScrollTop === null) {
-          label.textContent = "请先标记起点。";
+          label.textContent = ui("请先标记起点。", "Mark a start point first.");
           return;
         }
 
         if (pickedScrollTop <= startScrollTop + 8) {
-          label.textContent = "终点要在起点下方。可以继续滚动页面，再点击页面正文或“标记终点”；或按 Enter 截到页面结束";
+          label.textContent = ui(
+            "终点要在起点下方。可以继续滚动页面，再点击页面正文或“标记终点”；或按 Enter 截到页面结束",
+            "The end must be below the start. Keep scrolling, then click the page or Mark end; or press Enter to capture to the page end"
+          );
           return;
         }
 
@@ -498,7 +594,7 @@
       const captureToEnd = (event) => {
         stopPickerEvent(event);
         if (startScrollTop === null) {
-          label.textContent = "请先标记起点。";
+          label.textContent = ui("请先标记起点。", "Mark a start point first.");
           return;
         }
         finish({
@@ -566,11 +662,39 @@
       const updateGuidePosition = () => {
         line.style.top = `${currentClientY}px`;
         label.style.top = `${Math.min(window.innerHeight - 42, currentClientY + 10)}px`;
+        updateSelectionPreview();
+      };
+
+      const updateSelectionPreview = () => {
+        if (startScrollTop === null) {
+          selectionBand.style.display = "none";
+          selectionSize.style.display = "none";
+          return;
+        }
+        const metrics = getMetricsFor(targetInfo.element, targetInfo.isWindow);
+        const currentScrollTop = getScrollTopFor(targetInfo);
+        const pickedScrollTop = getPickedScrollTop(targetInfo, currentClientY);
+        const selectedHeight = Math.max(0, Math.round(pickedScrollTop - startScrollTop));
+        const startY = metrics.cropRect.y + startScrollTop - currentScrollTop;
+        const endY = clamp(currentClientY, metrics.cropRect.y, metrics.cropRect.y + metrics.visibleHeight);
+        const visibleTop = clamp(Math.min(startY, endY), metrics.cropRect.y, metrics.cropRect.y + metrics.visibleHeight);
+        const visibleBottom = clamp(Math.max(startY, endY), metrics.cropRect.y, metrics.cropRect.y + metrics.visibleHeight);
+        const width = Math.max(1, Math.round(metrics.cropRect.width));
+        selectionBand.style.left = `${metrics.cropRect.x}px`;
+        selectionBand.style.top = `${visibleTop}px`;
+        selectionBand.style.width = `${metrics.cropRect.width}px`;
+        selectionBand.style.height = `${Math.max(1, visibleBottom - visibleTop)}px`;
+        selectionBand.style.display = "block";
+        selectionSize.textContent = `${width} × ${selectedHeight} px`;
+        selectionSize.style.left = `${Math.min(window.innerWidth - 150, Math.max(8, metrics.cropRect.x + 10))}px`;
+        selectionSize.style.top = `${Math.min(window.innerHeight - 36, Math.max(8, endY + 10))}px`;
+        selectionSize.style.display = "block";
       };
 
       function updateStartLinePosition() {
         if (startScrollTop === null) {
           startLine.style.display = "none";
+          updateSelectionPreview();
           return;
         }
         const metrics = getMetricsFor(targetInfo.element, targetInfo.isWindow);
@@ -578,13 +702,16 @@
         const y = metrics.cropRect.y + startScrollTop - currentScrollTop;
         if (y < metrics.cropRect.y || y > metrics.cropRect.y + metrics.visibleHeight) {
           startLine.style.display = "none";
+          updateSelectionPreview();
           return;
         }
         startLine.style.top = `${y}px`;
         startLine.style.display = "block";
+        updateSelectionPreview();
       }
 
       state.startPickerCleanup = cleanup;
+      state.startPickerCancel = () => finish({ ok: true, cancelled: true });
       updateGuidePosition();
       controlsLayer.addEventListener("pointerdown", stopControlEvent);
       controlsLayer.addEventListener("pointerup", stopControlEvent);
@@ -595,8 +722,15 @@
       activateOnPointer(cancelButton, cancel);
       document.addEventListener("pointermove", onPointerMove, true);
       document.addEventListener("pointerdown", onPagePointerDown, true);
-      document.addEventListener("keydown", onKeydown, true);
+      window.addEventListener("keydown", onKeydown, true);
       document.addEventListener("scroll", updateStartLinePosition, true);
+      requestAnimationFrame(() => {
+        try {
+          startButton.focus({ preventScroll: true });
+        } catch (_error) {
+          startButton.focus();
+        }
+      });
     });
   }
 
@@ -633,16 +767,57 @@
     const viewportOffset = targetInfo.isWindow
       ? clientY
       : clamp(clientY, metrics.cropRect.y, metrics.cropRect.y + metrics.cropRect.height) - metrics.cropRect.y;
-    const maxTop = Math.max(0, metrics.totalHeight - metrics.visibleHeight);
-    return Math.round(clamp(currentScrollTop + viewportOffset, 0, maxTop));
+    const maxBottom = Math.max(0, metrics.totalHeight);
+    return Math.round(clamp(currentScrollTop + viewportOffset, 0, maxBottom));
   }
 
   function cancelStartPicker() {
+    if (typeof state.startPickerCancel === "function") {
+      state.startPickerCancel();
+      return;
+    }
     if (typeof state.startPickerCleanup === "function") {
       const cleanup = state.startPickerCleanup;
       state.startPickerCleanup = null;
       cleanup();
+      return;
     }
+    if (state.startPickerRequested || state.startPickerOpening) {
+      state.startPickerCancelPending = true;
+    }
+  }
+
+  function resetStartPicker(options = {}) {
+    const pendingCancel = options.preservePendingCancel && state.startPickerCancelPending;
+    if (typeof state.startPickerCancel === "function") {
+      state.startPickerCancel();
+    } else if (typeof state.startPickerCleanup === "function") {
+      const cleanup = state.startPickerCleanup;
+      state.startPickerCleanup = null;
+      cleanup();
+    }
+    state.startPickerRequested = false;
+    state.startPickerOpening = false;
+    state.startPickerCancelPending = Boolean(pendingCancel);
+  }
+
+  function armCaptureStop(sessionId) {
+    const nextSessionId = String(sessionId || "");
+    if (!nextSessionId) {
+      return;
+    }
+    state.captureSessionId = nextSessionId;
+    state.stopRequestSent = false;
+    installStopKeyListener();
+  }
+
+  function disarmCaptureStop(sessionId) {
+    if (sessionId && state.captureSessionId && sessionId !== state.captureSessionId) {
+      return;
+    }
+    removeStopKeyListener();
+    state.captureSessionId = "";
+    state.stopRequestSent = false;
   }
 
   function installStopKeyListener() {
@@ -653,23 +828,27 @@
       }
       event.preventDefault();
       event.stopImmediatePropagation();
-      try {
-        chrome.runtime.sendMessage({
+      if (state.stopRequestSent) {
+        return;
+      }
+      state.stopRequestSent = true;
+      Promise.resolve(chrome.runtime.sendMessage({
           type: "XF_USER_STOP_CAPTURE",
           sessionId: state.captureSessionId
+        }))
+        .catch((error) => {
+          state.stopRequestSent = false;
+          console.warn("Could not request capture stop.", error);
         });
-      } catch (error) {
-        console.warn("Could not request capture stop.", error);
-      }
     };
-    document.addEventListener("keydown", state.stopKeyHandler, true);
+    window.addEventListener("keydown", state.stopKeyHandler, true);
   }
 
   function removeStopKeyListener() {
     if (!state.stopKeyHandler) {
       return;
     }
-    document.removeEventListener("keydown", state.stopKeyHandler, true);
+    window.removeEventListener("keydown", state.stopKeyHandler, true);
     state.stopKeyHandler = null;
   }
 

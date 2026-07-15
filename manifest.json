@@ -1,9 +1,10 @@
 {
   "manifest_version": 3,
-  "name": "XF FullPage Capture Sections",
-  "short_name": "XF Sections",
-  "description": "Capture long pages in sections, manage cached sections, then export PNG, JPEG, paginated images, or merged PDFs.",
-  "version": "1.0.2",
+  "name": "__MSG_extensionName__",
+  "short_name": "__MSG_extensionShortName__",
+  "description": "__MSG_extensionDescription__",
+  "version": "1.1.0",
+  "default_locale": "en",
   "homepage_url": "https://github.com/Yifo98/XF-FullPage-Capture",
   "icons": {
     "16": "icons/icon-16.png",
@@ -12,7 +13,7 @@
     "128": "icons/icon-128.png"
   },
   "action": {
-    "default_title": "XF FullPage Capture Sections",
+    "default_title": "__MSG_actionTitle__",
     "default_popup": "popup/popup.html",
     "default_icon": {
       "16": "icons/icon-16.png",
@@ -31,7 +32,7 @@
         "default": "Alt+Shift+S",
         "mac": "Alt+Shift+S"
       },
-      "description": "Stop the current XF FullPage Capture job"
+      "description": "__MSG_stopCaptureCommand__"
     }
   },
   "permissions": [

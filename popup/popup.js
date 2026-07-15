@@ -8,10 +8,16 @@ const elements = {
 
 let activeTab = null;
 let runningTabId = null;
+let activeRangeSessionId = "";
 
-init().catch((error) => {
-  setStatus(error.message || String(error), true);
-});
+document.addEventListener("keydown", handlePopupKeydown, true);
+
+Promise.resolve(globalThis.XFI18n?.ready?.())
+  .then(() => globalThis.XFI18n?.applyDocument?.(document))
+  .then(() => init())
+  .catch((error) => {
+    setStatus(error.message || String(error), true);
+  });
 
 elements.captureNow.addEventListener("click", () => {
   startCapture("immediate");
@@ -25,26 +31,45 @@ elements.captureRange.addEventListener("click", () => {
   startCapture("range");
 });
 
-elements.stopCapture.addEventListener("click", async () => {
+elements.stopCapture.addEventListener("click", () => {
+  stopActiveCapture().catch((error) => {
+    setButtonsDisabled(false);
+    setStatus(error.message || String(error), true);
+  });
+});
+
+async function stopActiveCapture() {
   if (!activeTab?.id) {
     return;
   }
-  try {
-    setButtonsDisabled(true);
-    const response = await chrome.runtime.sendMessage({
-      type: "STOP_CAPTURE",
-      tabId: runningTabId || activeTab.id
-    });
-    if (!response?.ok) {
-      throw new Error(response?.error || "停止失败。");
-    }
-    setStatus(response.stopped ? "已请求停止，正在导出已截部分。" : "当前标签没有正在进行的截图。");
-    setTimeout(() => window.close(), 500);
-  } catch (error) {
+  setButtonsDisabled(true);
+  const response = await chrome.runtime.sendMessage({
+    type: "STOP_CAPTURE",
+    tabId: runningTabId || activeTab.id,
+    sessionId: activeRangeSessionId || undefined
+  });
+  if (!response?.ok) {
+    throw new Error(response?.error || "停止失败。");
+  }
+  const wasRangePicker = Boolean(activeRangeSessionId);
+  activeRangeSessionId = "";
+  setStatus(wasRangePicker
+    ? "框选已取消。"
+    : response.stopped ? "已请求停止，正在导出已截部分。" : "当前标签没有正在进行的截图。");
+  setTimeout(() => window.close(), wasRangePicker ? 220 : 500);
+}
+
+function handlePopupKeydown(event) {
+  if (event.key !== "Escape" || !activeRangeSessionId) {
+    return;
+  }
+  event.preventDefault();
+  event.stopImmediatePropagation();
+  stopActiveCapture().catch((error) => {
     setButtonsDisabled(false);
     setStatus(error.message || String(error), true);
-  }
-});
+  });
+}
 
 async function init() {
   const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -84,6 +109,12 @@ async function startCapture(mode) {
       throw new Error(response?.error || "启动截图失败。");
     }
     setStatus(getStartStatus(mode));
+    if (mode === "range") {
+      activeRangeSessionId = response.sessionId || "";
+      runningTabId = activeTab.id;
+      elements.stopCapture.disabled = false;
+      return;
+    }
     setTimeout(() => window.close(), 500);
   } catch (error) {
     setButtonsDisabled(false);

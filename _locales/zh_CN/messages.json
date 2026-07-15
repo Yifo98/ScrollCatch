@@ -1,0 +1,17 @@
+{
+  "extensionName": {
+    "message": "ScrollCatch — Full Page Capture"
+  },
+  "extensionShortName": {
+    "message": "ScrollCatch"
+  },
+  "extensionDescription": {
+    "message": "完整截取网页，支持长页续接、演示稿逐页捕获、裁切、分页、多段整理与导出。"
+  },
+  "actionTitle": {
+    "message": "ScrollCatch：截取完整页面"
+  },
+  "stopCaptureCommand": {
+    "message": "停止当前截图并保留已截内容"
+  }
+}

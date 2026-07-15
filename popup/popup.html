@@ -1,41 +1,61 @@
 <!doctype html>
-<html lang="zh-CN">
+<html lang="en">
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>XF FullPage Capture</title>
+    <title>ScrollCatch</title>
     <link rel="stylesheet" href="./popup.css">
   </head>
   <body>
     <main class="popup">
-      <header>
-        <p class="eyebrow">XF Capture</p>
-        <h1>网页捕获工作台</h1>
+      <header class="brand">
+        <img class="brand-icon" src="../icons/icon-48.png" alt="">
+        <div class="brand-copy">
+          <p class="eyebrow">ScrollCatch</p>
+          <h1>把整页，完整带走</h1>
+        </div>
+        <label class="locale-control">
+          <span class="locale-label">界面语言</span>
+          <select data-locale-select data-i18n-ignore aria-label="界面语言">
+            <option value="en">English</option>
+            <option value="zh-CN">中文</option>
+          </select>
+        </label>
       </header>
 
       <section class="actions" aria-label="截图操作">
-        <button id="captureNow" type="button">捕获完整页面</button>
-        <button id="captureCurrent" type="button">从当前位置捕获</button>
-        <button id="captureRange" type="button">框选捕获范围</button>
-        <button id="stopCapture" class="secondary" type="button" disabled>停止捕获（Esc）</button>
+        <button id="captureNow" class="primary-action" type="button">
+          <span>截取完整页面</span>
+          <small>从顶部开始，自动滚动并拼接</small>
+        </button>
+        <div class="secondary-actions">
+          <button id="captureCurrent" type="button">
+            <span>从当前位置</span>
+            <small>继续向下捕获</small>
+          </button>
+          <button id="captureRange" type="button">
+            <span>框选范围</span>
+            <small>只保留需要的部分</small>
+          </button>
+        </div>
+        <button id="stopCapture" class="stop-action" type="button" disabled>停止并保留已截内容 <kbd>Esc</kbd></button>
       </section>
 
-      <section class="notice" aria-label="截图提醒">
-        <p>PPT 预览页按左侧页码逐页捕获；普通网页按页面滚动拼接。</p>
-        <p>只想接着当前画面往下截，就选“从当前位置捕获”。</p>
-        <p>长网页图片很多时，先手动滚到页面底部预加载，再回到要开始的位置截图会更稳。</p>
-      </section>
+      <p id="status" class="status" aria-live="polite">正在检查当前页面...</p>
 
-      <section class="shortcut-card" aria-label="快捷键">
-        <p class="shortcut-title">截图快捷键</p>
-        <p><kbd>Enter</kbd><span>选好起点后截到结尾</span></p>
-        <p><kbd>Esc</kbd><span>停止当前截图</span></p>
-        <p><kbd>Alt+Shift+S</kbd><span>切到其他标签后停止</span></p>
-      </section>
-
-      <p id="status" class="status">选择捕获方式。</p>
+      <details class="capture-guide">
+        <summary>截图提示与快捷键</summary>
+        <div class="guide-content">
+          <p>PPT 预览会按左侧页码逐页捕获；普通网页按滚动位置拼接。</p>
+          <p>图片很多的长页面，先滚到底部完成预加载会更稳。</p>
+          <div class="shortcut-row"><kbd>Enter</kbd><span>选好起点后截到结尾</span></div>
+          <div class="shortcut-row"><kbd>Esc</kbd><span>停止并保留已截内容</span></div>
+          <div class="shortcut-row"><kbd>Alt+Shift+S</kbd><span>切到其他标签后停止</span></div>
+        </div>
+      </details>
     </main>
 
+    <script src="../shared/i18n.js"></script>
     <script src="./popup.js"></script>
   </body>
 </html>

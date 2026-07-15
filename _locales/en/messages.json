@@ -1,0 +1,17 @@
+{
+  "extensionName": {
+    "message": "ScrollCatch — Full Page Capture"
+  },
+  "extensionShortName": {
+    "message": "ScrollCatch"
+  },
+  "extensionDescription": {
+    "message": "Capture full web pages with long-page continuation, slide-by-slide presentation capture, cropping, pagination, section management, and export."
+  },
+  "actionTitle": {
+    "message": "ScrollCatch: Capture full page"
+  },
+  "stopCaptureCommand": {
+    "message": "Stop the current capture and keep captured content"
+  }
+}

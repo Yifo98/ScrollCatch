@@ -1,3 +1,5 @@
+import "./shared/i18n.js";
+
 const captures = new Map();
 const runningCaptures = new Map();
 
@@ -13,6 +15,46 @@ const DEFAULT_SEGMENT_HEIGHT = 96000;
 const MIN_SEGMENT_HEIGHT = 2400;
 const CAPTURE_INDEX_KEY = "xfCaptureIndex";
 const MAX_STORED_CAPTURES = 12;
+const PENDING_CONTINUATION_PREFIX = "xfPendingContinuation:";
+const PENDING_CONTINUATION_MAX_AGE_MS = 30 * 60 * 1000;
+const INTERFACE_LOCALE_KEY = "xfFullPageCapture:locale";
+const pendingContinuations = new Map();
+let interfaceLocale = "en";
+
+Promise.resolve(chrome.storage?.local?.get?.(INTERFACE_LOCALE_KEY))
+  .then((stored) => updateActionTitle(stored?.[INTERFACE_LOCALE_KEY]))
+  .catch(() => {});
+
+chrome.storage?.onChanged?.addListener?.((changes, areaName) => {
+  if (areaName === "local" && changes?.[INTERFACE_LOCALE_KEY]) {
+    updateActionTitle(changes[INTERFACE_LOCALE_KEY].newValue);
+  }
+});
+
+function updateActionTitle(locale) {
+  interfaceLocale = /^zh(?:-|$)/i.test(locale || "") ? "zh-CN" : "en";
+  const title = interfaceLocale === "en" ? "Capture full page" : "截取完整页面";
+  return chrome.action?.setTitle?.({ title })?.catch?.(() => {});
+}
+
+function backgroundT(value) {
+  return globalThis.XFI18n?.translateText?.(value, interfaceLocale) ?? value;
+}
+
+function backgroundErrorForUser(error) {
+  const message = error?.message || String(error);
+  if (/Capture expired\. Please run the capture again\./i.test(message)) {
+    return backgroundT("截图缓存已失效，请重新截图。");
+  }
+  if (/This capture has no saved resume position\./i.test(message)) {
+    return backgroundT("当前截图没有可继续获取的结束位置。");
+  }
+  const missingSlice = message.match(/Slice\s+(\d+)\s+is missing\./i);
+  if (missingSlice) {
+    return backgroundT(`第 ${missingSlice[1]} 张截图切片缺失。`);
+  }
+  return backgroundT(message);
+}
 
 class CaptureCancelledError extends Error {
   constructor(message) {
@@ -30,35 +72,42 @@ chrome.commands.onCommand.addListener((command) => {
 chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message?.type === "START_CAPTURE") {
     launchCaptureFromMessage(message).then(sendResponse).catch((error) => {
-      sendResponse({ ok: false, error: error.message || String(error) });
+      sendResponse({ ok: false, error: backgroundErrorForUser(error) });
     });
     return true;
   }
 
   if (message?.type === "OPEN_SOURCE_AT_SCROLL") {
-    openSourceAtScroll(message.captureId).then(sendResponse).catch((error) => {
-      sendResponse({ ok: false, error: error.message || String(error) });
+    openSourceAtScroll(message.captureId, message.capture).then(sendResponse).catch((error) => {
+      sendResponse({ ok: false, error: backgroundErrorForUser(error) });
+    });
+    return true;
+  }
+
+  if (message?.type === "OPEN_SOURCE") {
+    openOriginalSource(message.captureId, message.source).then(sendResponse).catch((error) => {
+      sendResponse({ ok: false, error: backgroundErrorForUser(error) });
     });
     return true;
   }
 
   if (message?.type === "START_CAPTURE_FROM_SOURCE_SCROLL") {
     startCaptureFromSourceScroll(message.captureId, _sender?.tab?.id).then(sendResponse).catch((error) => {
-      sendResponse({ ok: false, error: error.message || String(error) });
+      sendResponse({ ok: false, error: backgroundErrorForUser(error) });
     });
     return true;
   }
 
   if (message?.type === "STOP_CAPTURE" || message?.type === "XF_USER_STOP_CAPTURE") {
     requestCaptureStop(message.tabId, message.sessionId).then(sendResponse).catch((error) => {
-      sendResponse({ ok: false, error: error.message || String(error) });
+      sendResponse({ ok: false, error: backgroundErrorForUser(error) });
     });
     return true;
   }
 
   if (message?.type === "GET_RUNNING_STATE") {
     getRunningState(message.tabId).then(sendResponse).catch((error) => {
-      sendResponse({ ok: false, error: error.message || String(error) });
+      sendResponse({ ok: false, error: backgroundErrorForUser(error) });
     });
     return true;
   }
@@ -66,7 +115,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
   if (message?.type === "GET_CAPTURE_META") {
     getCapture(message.captureId).then((payload) => {
       if (!payload) {
-        sendResponse({ ok: false, error: "Capture expired. Please run the capture again." });
+        sendResponse({ ok: false, error: backgroundT("截图缓存已失效，请重新截图。") });
         return;
       }
       sendResponse({
@@ -77,7 +126,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
         }
       });
     }).catch((error) => {
-      sendResponse({ ok: false, error: error.message || String(error) });
+      sendResponse({ ok: false, error: backgroundErrorForUser(error) });
     });
     return true;
   }
@@ -86,12 +135,12 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     getCapture(message.captureId).then((payload) => {
       const slice = payload?.slices?.[message.index];
       if (!slice) {
-        sendResponse({ ok: false, error: `Slice ${message.index + 1} is missing.` });
+        sendResponse({ ok: false, error: backgroundT(`第 ${message.index + 1} 张截图切片缺失。`) });
         return;
       }
       sendResponse({ ok: true, slice });
     }).catch((error) => {
-      sendResponse({ ok: false, error: error.message || String(error) });
+      sendResponse({ ok: false, error: backgroundErrorForUser(error) });
     });
     return true;
   }
@@ -100,7 +149,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     listCaptures().then((captures) => {
       sendResponse({ ok: true, captures });
     }).catch((error) => {
-      sendResponse({ ok: false, error: error.message || String(error) });
+      sendResponse({ ok: false, error: backgroundErrorForUser(error) });
     });
     return true;
   }
@@ -109,7 +158,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     removeCapture(message.captureId).then(() => {
       sendResponse({ ok: true });
     }).catch((error) => {
-      sendResponse({ ok: false, error: error.message || String(error) });
+      sendResponse({ ok: false, error: backgroundErrorForUser(error) });
     });
     return true;
   }
@@ -118,7 +167,7 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     clearCaptures().then((captureIds) => {
       sendResponse({ ok: true, captureIds });
     }).catch((error) => {
-      sendResponse({ ok: false, error: error.message || String(error) });
+      sendResponse({ ok: false, error: backgroundErrorForUser(error) });
     });
     return true;
   }
@@ -129,15 +178,91 @@ chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
 async function launchCaptureFromMessage(message) {
   const tab = await resolveCaptureTab(message.tabId);
   const mode = normalizeCaptureMode(message.mode);
+  const continuation = await takePendingContinuation(tab, mode);
   return launchCapture(tab, {
     mode,
-    captureProfile: normalizeCaptureProfile(message.captureProfile || (mode === "range" ? "default" : message.mode || "auto"))
+    captureProfile: normalizeCaptureProfile(message.captureProfile || (mode === "range" ? "default" : message.mode || "auto")),
+    ...continuation
   });
 }
 
-async function openSourceAtScroll(captureId) {
-  const { tab, scrollTop } = await returnSourceToCaptureScroll(captureId);
+async function openSourceAtScroll(captureId, fallbackCapture = null) {
+  const { payload, tab, scrollTop } = await returnSourceToCaptureScroll(captureId, fallbackCapture);
+  await rememberPendingContinuation(tab, payload, captureId);
   return { ok: true, tabId: tab.id, scrollTop };
+}
+
+async function rememberPendingContinuation(tab, payload, captureId) {
+  if (!Number.isInteger(tab?.id)) {
+    return;
+  }
+  const parentCaptureId = payload?.id || captureId || "";
+  if (!parentCaptureId) {
+    return;
+  }
+  const pending = {
+    parentCaptureId,
+    segmentPart: (Number(payload?.segment?.part) || 1) + 1,
+    sourceUrl: String(payload?.source?.url || tab.url || ""),
+    createdAt: Date.now()
+  };
+  pendingContinuations.set(tab.id, pending);
+  await pendingContinuationStorage().set({ [pendingContinuationKey(tab.id)]: pending }).catch(() => {});
+}
+
+async function takePendingContinuation(tab, mode) {
+  if (!Number.isInteger(tab?.id)) {
+    return {};
+  }
+  const key = pendingContinuationKey(tab.id);
+  let pending = pendingContinuations.get(tab.id) || null;
+  if (!pending) {
+    const stored = await pendingContinuationStorage().get(key).catch(() => ({}));
+    pending = stored?.[key] || null;
+  }
+  if (!pending) {
+    return {};
+  }
+
+  pendingContinuations.delete(tab.id);
+  await pendingContinuationStorage().remove(key).catch(() => {});
+
+  const age = Date.now() - Number(pending.createdAt || 0);
+  const sourceMatches = !pending.sourceUrl
+    || !tab.url
+    || normalizeUrl(pending.sourceUrl) === normalizeUrl(tab.url);
+  if (
+    mode !== "current"
+    || !pending.parentCaptureId
+    || !Number.isFinite(age)
+    || age < 0
+    || age > PENDING_CONTINUATION_MAX_AGE_MS
+    || !sourceMatches
+  ) {
+    return {};
+  }
+  return {
+    segmentPart: Math.max(2, Number(pending.segmentPart) || 2),
+    parentCaptureId: pending.parentCaptureId
+  };
+}
+
+function pendingContinuationKey(tabId) {
+  return `${PENDING_CONTINUATION_PREFIX}${tabId}`;
+}
+
+function pendingContinuationStorage() {
+  return chrome.storage.session || chrome.storage.local;
+}
+
+async function openOriginalSource(captureId, fallbackSource = null) {
+  const payload = await getCapture(captureId) || (fallbackSource ? { source: fallbackSource } : null);
+  if (!payload) {
+    throw new Error(backgroundT("截图缓存已失效，请重新截图。"));
+  }
+  const tab = await ensureSourceTab(payload);
+  await activateCaptureTab(tab.id, tab.windowId || payload.source?.windowId);
+  return { ok: true, tabId: tab.id };
 }
 
 async function startCaptureFromSourceScroll(captureId, resultTabId = null) {
@@ -152,37 +277,31 @@ async function startCaptureFromSourceScroll(captureId, resultTabId = null) {
   });
 }
 
-async function returnSourceToCaptureScroll(captureId) {
-  const payload = await getCapture(captureId);
+async function returnSourceToCaptureScroll(captureId, fallbackCapture = null) {
+  const payload = await getCapture(captureId) || fallbackCapture;
   if (!payload) {
-    throw new Error("Capture expired. Please run the capture again.");
+    throw new Error(backgroundT("截图缓存已失效，请重新截图。"));
   }
   const scrollTop = getResumeScrollTop(payload);
   if (!Number.isFinite(scrollTop)) {
-    throw new Error("This capture has no saved resume position.");
+    throw new Error(backgroundT("当前截图没有可继续获取的结束位置。"));
   }
 
-  const tab = await chrome.tabs.get(payload.source.tabId);
+  const tab = await ensureSourceTab(payload);
   const windowId = tab.windowId || payload.source.windowId;
   await activateCaptureTab(tab.id, windowId);
-  await injectCaptureScripts(tab.id);
   const frameId = Number.isInteger(payload.target?.frameId) ? payload.target.frameId : 0;
-  let response = await sendToFrame(tab.id, frameId, {
-    type: "XF_SCROLL_TO_POSITION",
-    scrollTop,
-    captureProfile: normalizeCaptureProfile(payload.target?.captureProfile),
-    target: buildResumeTargetHint(payload)
-  }).catch((error) => ({ ok: false, error: error.message || String(error) }));
-  if (!response?.ok && frameId !== 0) {
-    response = await sendToFrame(tab.id, 0, {
-      type: "XF_SCROLL_TO_POSITION",
-      scrollTop,
-      captureProfile: normalizeCaptureProfile(payload.target?.captureProfile),
-      target: buildResumeTargetHint(payload)
-    }).catch((error) => ({ ok: false, error: error.message || String(error) }));
+  let response = null;
+  for (let attempt = 0; attempt < 12; attempt += 1) {
+    await injectCaptureScripts(tab.id);
+    response = await sendResumeScrollMessage(tab.id, frameId, payload, scrollTop);
+    if (response?.ok && isResumePositionReady(response.scrollTop, scrollTop)) {
+      break;
+    }
+    await sleep(Math.min(1200, 300 + attempt * 120));
   }
-  if (!response?.ok) {
-    throw new Error(response?.error || "Could not return to the source page position.");
+  if (!response?.ok || !isResumePositionReady(response.scrollTop, scrollTop)) {
+    throw new Error(response?.error || backgroundT("原文页面已重新打开，但长内容还没有恢复到保存的位置。"));
   }
   return {
     payload,
@@ -191,17 +310,86 @@ async function returnSourceToCaptureScroll(captureId) {
   };
 }
 
+async function sendResumeScrollMessage(tabId, frameId, payload, scrollTop) {
+  const message = {
+    type: "XF_SCROLL_TO_POSITION",
+    scrollTop,
+    captureProfile: normalizeCaptureProfile(payload.target?.captureProfile),
+    target: buildResumeTargetHint(payload)
+  };
+  let response = await sendToFrame(tabId, frameId, message)
+    .catch((error) => ({ ok: false, error: error.message || String(error) }));
+  if ((!response?.ok || !isResumePositionReady(response.scrollTop, scrollTop)) && frameId !== 0) {
+    response = await sendToFrame(tabId, 0, message)
+      .catch((error) => ({ ok: false, error: error.message || String(error) }));
+  }
+  return response;
+}
+
+function isResumePositionReady(actualScrollTop, expectedScrollTop) {
+  const actual = Number(actualScrollTop);
+  const expected = Number(expectedScrollTop);
+  if (!Number.isFinite(actual) || !Number.isFinite(expected)) {
+    return false;
+  }
+  return Math.abs(actual - expected) <= Math.max(8, expected * 0.002);
+}
+
+async function ensureSourceTab(payload) {
+  const source = payload?.source || {};
+  const sourceUrl = String(source.url || "").trim();
+  let tab = null;
+
+  if (Number.isInteger(source.tabId)) {
+    tab = await chrome.tabs.get(source.tabId).catch(() => null);
+    if (tab && sourceUrl && tab.url && normalizeUrl(tab.url) !== normalizeUrl(sourceUrl)) {
+      tab = null;
+    }
+  }
+
+  if (tab) {
+    return tab;
+  }
+  if (!sourceUrl || !canInject(sourceUrl)) {
+    throw new Error(backgroundT("原文标签页已关闭，并且无法重新打开该页面。"));
+  }
+
+  tab = await chrome.tabs.create({ url: sourceUrl, active: true });
+  return waitForSourceTabReady(tab);
+}
+
+async function waitForSourceTabReady(initialTab) {
+  let tab = initialTab;
+  for (let attempt = 0; attempt < 24; attempt += 1) {
+    if (tab?.status === "complete") {
+      return tab;
+    }
+    await sleep(250);
+    tab = await chrome.tabs.get(initialTab.id).catch(() => tab);
+  }
+  return tab;
+}
+
 function getResumeScrollTop(payload) {
   const end = Number(payload.segment?.endScrollTop);
   if (Number.isFinite(end)) {
-    return end;
+    return clampResumeScrollTop(payload, end);
   }
   const next = Number(payload.segment?.nextScrollTop);
   if (Number.isFinite(next)) {
-    return next;
+    return clampResumeScrollTop(payload, next);
   }
   const targetHeight = Number(payload.target?.totalHeight);
-  return Number.isFinite(targetHeight) ? targetHeight : null;
+  return Number.isFinite(targetHeight) ? clampResumeScrollTop(payload, targetHeight) : null;
+}
+
+function clampResumeScrollTop(payload, scrollTop) {
+  const fullHeight = Number(payload.segment?.fullTotalHeight || payload.target?.fullTotalHeight || payload.target?.totalHeight);
+  const visibleHeight = Number(payload.target?.visibleHeight);
+  if (!Number.isFinite(fullHeight) || !Number.isFinite(visibleHeight) || fullHeight <= visibleHeight) {
+    return Math.max(0, scrollTop);
+  }
+  return Math.max(0, Math.min(scrollTop, fullHeight - visibleHeight));
 }
 
 function buildResumeTargetHint(payload) {
@@ -282,9 +470,12 @@ function launchCapture(tab, options = {}) {
 
 async function requestCaptureStop(tabId, sessionId) {
   let stopped = false;
+  const tabsToCancel = new Set();
 
   if (Number.isInteger(tabId) && runningCaptures.has(tabId)) {
-    runningCaptures.get(tabId).stopRequested = true;
+    const controller = runningCaptures.get(tabId);
+    controller.stopRequested = true;
+    tabsToCancel.add(controller.tabId);
     stopped = true;
   }
 
@@ -292,10 +483,13 @@ async function requestCaptureStop(tabId, sessionId) {
     for (const controller of runningCaptures.values()) {
       if (controller.sessionId === sessionId) {
         controller.stopRequested = true;
+        tabsToCancel.add(controller.tabId);
         stopped = true;
       }
     }
   }
+
+  await Promise.allSettled([...tabsToCancel].map(cancelCaptureRangePicker));
 
   return { ok: true, stopped };
 }
@@ -304,9 +498,16 @@ function requestAllCaptureStops() {
   let stopped = false;
   for (const controller of runningCaptures.values()) {
     controller.stopRequested = true;
+    cancelCaptureRangePicker(controller.tabId).catch(() => {});
     stopped = true;
   }
   return { ok: true, stopped };
+}
+
+async function cancelCaptureRangePicker(tabId) {
+  const frames = await getFrames(tabId);
+  const message = { type: "XF_CANCEL_CAPTURE_RANGE" };
+  await Promise.allSettled(frames.map((frame) => sendToFrame(tabId, frame.frameId, message)));
 }
 
 async function getRunningState(tabId) {
@@ -331,6 +532,11 @@ async function startCapture(tab, controller) {
 
   await activateCaptureTab(tab.id, windowId, controller);
   await injectCaptureScripts(tab.id);
+  await setCaptureStopArmed(tab.id, controller.sessionId, true);
+  try {
+  if (controller.stopRequested) {
+    throw new CaptureCancelledError("Capture cancelled before the range picker opened.");
+  }
   const captureProfile = normalizeCaptureProfile(controller.options.captureProfile);
   const targetFrame = await chooseCaptureFrame(tab.id, captureProfile);
   const topViewport = await getTopViewport(tab.id);
@@ -357,6 +563,9 @@ async function startCapture(tab, controller) {
       throw new Error(picked?.error || "Could not read the custom capture range.");
     }
     if (picked.cancelled) {
+      throw new CaptureCancelledError("Custom range capture was cancelled.");
+    }
+    if (controller.stopRequested) {
       throw new CaptureCancelledError("Custom range capture was cancelled.");
     }
     startScrollTop = picked.startScrollTop;
@@ -538,6 +747,7 @@ async function startCapture(tab, controller) {
     capturedAt: new Date().toISOString(),
     source: {
       tabId: tab.id,
+      windowId: tab.windowId,
       url: liveTab.url || tab.url || "",
       title: liveTab.title || tab.title || ""
     },
@@ -561,6 +771,9 @@ async function startCapture(tab, controller) {
   await persistCapture(captureId, payload);
 
   await openCaptureResultTab(captureId, controller.options.resultTabId);
+  } finally {
+    await setCaptureStopArmed(tab.id, controller.sessionId, false);
+  }
 }
 
 async function capturePageSequence({
@@ -671,6 +884,7 @@ async function capturePageSequence({
     capturedAt: new Date().toISOString(),
     source: {
       tabId: tab.id,
+      windowId: tab.windowId,
       url: liveTab.url || tab.url || "",
       title: liveTab.title || tab.title || ""
     },
@@ -741,6 +955,15 @@ async function injectCaptureScripts(tabId) {
       files: ["content/capture-target.js"]
     });
   }
+}
+
+async function setCaptureStopArmed(tabId, sessionId, armed) {
+  const frames = await getFrames(tabId);
+  const message = {
+    type: armed ? "XF_ARM_CAPTURE_STOP" : "XF_DISARM_CAPTURE_STOP",
+    sessionId
+  };
+  await Promise.allSettled(frames.map((frame) => sendToFrame(tabId, frame.frameId, message)));
 }
 
 async function chooseCaptureFrame(tabId, captureProfile = "default") {
@@ -1027,7 +1250,7 @@ function clampScrollTop(value, target) {
 async function setCaptureBadge(tabId, text) {
   await chrome.action.setBadgeText({ tabId, text });
   if (text) {
-    await chrome.action.setBadgeBackgroundColor({ tabId, color: "#0f766e" }).catch(() => {});
+    await chrome.action.setBadgeBackgroundColor({ tabId, color: "#0b5cff" }).catch(() => {});
   }
 }
 
@@ -1173,24 +1396,24 @@ function formatCaptureErrorForUser(error) {
   const oldPageNavigationMatch = message.match(/PPT page navigation landed on page (\d+) instead of (\d+)/i);
   if (oldPageNavigationMatch) {
     return [
-      "截图未完成：PPT 预览器没有成功跳到目标页。",
-      `当前停在第 ${oldPageNavigationMatch[1]} 页，目标是第 ${oldPageNavigationMatch[2]} 页。`,
-      "可以先点击左侧缩略图切到目标页后重试，或选择“从当前位置捕获”。"
+      backgroundT("截图未完成：PPT 预览器没有成功跳到目标页。"),
+      backgroundT(`当前停在第 ${oldPageNavigationMatch[1]} 页，目标是第 ${oldPageNavigationMatch[2]} 页。`),
+      backgroundT("可以先点击左侧缩略图切到目标页后重试，或选择“从当前位置捕获”。")
     ].join("\n");
   }
 
   const pageNavigationMatch = message.match(/PPT 页码跳转失败：目标第\s*(\d+)\s*页，当前仍在(.+?)。/);
   if (pageNavigationMatch) {
     return [
-      "截图未完成：PPT 预览器没有成功跳到目标页。",
-      `目标是第 ${pageNavigationMatch[1]} 页，当前仍在${pageNavigationMatch[2]}。`,
-      "可以先点击左侧缩略图切到目标页后重试，或选择“从当前位置捕获”。"
+      backgroundT("截图未完成：PPT 预览器没有成功跳到目标页。"),
+      backgroundT(`目标是第 ${pageNavigationMatch[1]} 页，当前仍在${pageNavigationMatch[2]}。`),
+      backgroundT("可以先点击左侧缩略图切到目标页后重试，或选择“从当前位置捕获”。")
     ].join("\n");
   }
 
   if (/Chrome does not allow capture scripts/i.test(message)) {
-    return "当前页面不允许扩展截图。请换到普通网页、飞书文档或 PPT 预览页后再试。";
+    return backgroundT("当前页面不允许扩展截图。请换到普通网页、飞书文档或 PPT 预览页后再试。");
   }
 
-  return `截图失败：${message}`;
+  return backgroundT(`截图失败：${message}`);
 }
