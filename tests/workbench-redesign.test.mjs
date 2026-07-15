@@ -215,7 +215,7 @@ test("quick results use a focused static primary CTA without a looping flourish"
   assert.match(html, /自定义分页/);
   assert.doesNotMatch(css, /workbench-cta-nudge/);
   assert.doesNotMatch(css, /conic-gradient/);
-  assert.match(css, /\.workbench-cta-button-shell\s*\{[^}]*border:\s*1px solid rgba\(11, 92, 255, 0\.2\)[^}]*box-shadow:/s);
+  assert.match(css, /\.workbench-cta-button-shell\s*\{[^}]*border:\s*1px solid rgba\([^)]*\)[^}]*box-shadow:/s);
 });
 
 

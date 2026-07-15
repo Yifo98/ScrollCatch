@@ -6,22 +6,24 @@
   const PAGE_CONTENT_READY_TIMEOUT_MS = 1200;
   const DOCUMENT_CONTENT_READY_TIMEOUT_MS = 1800;
   const PRESENTATION_CONTENT_READY_TIMEOUT_MS = 2600;
-  const LOCALE_STORAGE_KEY = "xfFullPageCapture:locale";
+  const LOCALE_STORAGE_KEY = "scrollCatch:locale";
+  const LEGACY_LOCALE_STORAGE_KEY = "xfFullPageCapture:locale";
   let interfaceLocale = "en";
 
   function normalizeInterfaceLocale(value) {
     return /^zh(?:-|$)/i.test(value || "") ? "zh-CN" : "en";
   }
 
-  const interfaceLocaleReady = Promise.resolve(chrome.storage?.local?.get?.(LOCALE_STORAGE_KEY))
+  const interfaceLocaleReady = Promise.resolve(chrome.storage?.local?.get?.([LOCALE_STORAGE_KEY, LEGACY_LOCALE_STORAGE_KEY]))
     .then((stored) => {
-      interfaceLocale = normalizeInterfaceLocale(stored?.[LOCALE_STORAGE_KEY]);
+      interfaceLocale = normalizeInterfaceLocale(stored?.[LOCALE_STORAGE_KEY] ?? stored?.[LEGACY_LOCALE_STORAGE_KEY]);
     })
     .catch(() => {});
 
   chrome.storage?.onChanged?.addListener?.((changes, areaName) => {
-    if (areaName === "local" && changes?.[LOCALE_STORAGE_KEY]) {
-      interfaceLocale = normalizeInterfaceLocale(changes[LOCALE_STORAGE_KEY].newValue);
+    const localeChange = changes?.[LOCALE_STORAGE_KEY] ?? changes?.[LEGACY_LOCALE_STORAGE_KEY];
+    if (areaName === "local" && localeChange) {
+      interfaceLocale = normalizeInterfaceLocale(localeChange.newValue);
     }
   });
 
@@ -29,13 +31,13 @@
     return interfaceLocale === "en" ? en : zh;
   }
 
-  if (window.__xfFullPageCaptureVersion === VERSION) {
+  if (window.__scrollCatchVersion === VERSION) {
     return;
   }
-  if (typeof window.__xfFullPageCaptureCleanup === "function") {
-    window.__xfFullPageCaptureCleanup();
+  if (typeof window.__scrollCatchCleanup === "function") {
+    window.__scrollCatchCleanup();
   }
-  window.__xfFullPageCaptureVersion = VERSION;
+  window.__scrollCatchVersion = VERSION;
 
   const state = {
     target: null,
@@ -147,7 +149,7 @@
   }
 
   chrome.runtime.onMessage.addListener(handleMessage);
-  window.__xfFullPageCaptureCleanup = () => {
+  window.__scrollCatchCleanup = () => {
     chrome.runtime.onMessage.removeListener(handleMessage);
     cancelStartPicker();
     restoreCapture();
@@ -181,7 +183,7 @@
     }
 
     state.styleNode = document.createElement("style");
-    state.styleNode.id = "xf-fullpage-capture-style";
+    state.styleNode.id = "scrollcatch-capture-style";
     state.styleNode.textContent = `
       html {
         scroll-behavior: auto !important;
@@ -400,7 +402,7 @@
       let currentClientY = Math.round(window.innerHeight / 2);
       let pickerFinished = false;
 
-      overlay.id = "xf-fullpage-capture-start-picker";
+      overlay.id = "scrollcatch-capture-start-picker";
       overlay.style.cssText = [
         "position: fixed",
         "inset: 0",
@@ -408,7 +410,7 @@
         "pointer-events: none",
         "cursor: crosshair"
       ].join(";");
-      controlsLayer.id = "xf-fullpage-capture-start-controls";
+      controlsLayer.id = "scrollcatch-capture-start-controls";
       controlsLayer.style.cssText = [
         "position: fixed",
         "inset: auto auto 16px 16px",

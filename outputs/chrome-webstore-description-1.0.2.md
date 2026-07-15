@@ -1,6 +1,6 @@
 中文说明：
 
-XF FullPage Capture 是一个本地优先的网页长截图、裁切、分页和分节合并导出工具。它可以捕获完整网页、在线文档、长文章、订单记录、网页报告，以及飞书 / Lark 等在线文档中打开后的 PPT / 演示文稿预览页。
+ScrollCatch — Full Page Capture 是一个本地优先的网页长截图、裁切、分页和分节合并导出工具。它可以捕获完整网页、在线文档、长文章、订单记录、网页报告，以及飞书 / Lark 等在线文档中打开后的 PPT / 演示文稿预览页。
 
 本次 1.0.2 更新重点：
 
@@ -23,16 +23,16 @@ XF FullPage Capture 是一个本地优先的网页长截图、裁切、分页和
 
 隐私说明：
 
-XF FullPage Capture 采用本地优先设计。截图数据、编辑草稿和本地缓存保存在浏览器扩展的本地存储中，不会上传到任何外部服务器。
+ScrollCatch — Full Page Capture 采用本地优先设计。截图数据、编辑草稿和本地缓存保存在浏览器扩展的本地存储中，不会上传到任何外部服务器。
 
 项目主页：
-https://github.com/Yifo98/XF-FullPage-Capture
+https://github.com/Yifo98/ScrollCatch
 
 -------------------------------------------------------------------------
 
 English Description:
 
-XF FullPage Capture is a local-first full-page screenshot, cropping, pagination, and section merge export tool. It helps capture long web pages, online documents, articles, receipts, reports, and opened PPT / presentation preview pages in Feishu, Lark, and similar document viewers.
+ScrollCatch — Full Page Capture is a local-first full-page screenshot, cropping, pagination, and section merge export tool. It helps capture long web pages, online documents, articles, receipts, reports, and opened PPT / presentation preview pages in Feishu, Lark, and similar document viewers.
 
 What is new in 1.0.2:
 
@@ -55,7 +55,7 @@ Main features:
 
 Privacy:
 
-XF FullPage Capture is local-first. Screenshot data, editing drafts, and local caches are stored in the browser extension's local storage and are not uploaded to any external server.
+ScrollCatch — Full Page Capture is local-first. Screenshot data, editing drafts, and local caches are stored in the browser extension's local storage and are not uploaded to any external server.
 
 Project homepage:
-https://github.com/Yifo98/XF-FullPage-Capture
+https://github.com/Yifo98/ScrollCatch

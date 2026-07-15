@@ -22,6 +22,7 @@ rm -f "${release_zip}"
 
 rsync -a \
   README.md \
+  CHANGELOG.md \
   PRIVACY.md \
   CONTEXT.md \
   manifest.json \
@@ -37,6 +38,7 @@ rsync -a \
 
 required_paths=(
   "manifest.json"
+  "CHANGELOG.md"
   "background.js"
   "shared/i18n.js"
   "_locales/zh_CN/messages.json"

@@ -2,7 +2,7 @@
 
 本次更新：
 
-XF FullPage Capture 1.0.0 重点增加了分节截图管理和分节合并编辑器，适合处理一次无法完整截完的超长文章、在线文档、知识库页面和资料页面。用户可以把同一篇长页面分成多节截取，再在同一个编辑器中统一分页、裁切、调整和导出。
+ScrollCatch — Full Page Capture 1.0.0 重点增加了分节截图管理和分节合并编辑器，适合处理一次无法完整截完的超长文章、在线文档、知识库页面和资料页面。用户可以把同一篇长页面分成多节截取，再在同一个编辑器中统一分页、裁切、调整和导出。
 
 新版新增了分节管理流程。对于特别长的页面，插件会按单段上限捕获，避免强行生成超长画布导致浏览器卡顿、空白或导出失败。到达上限后，用户可以先导出当前段，也可以从上次结束位置继续截取下一段。截取多节后，结果页会列出可用分节，用户可以勾选、排序并进入合并编辑器。
 
@@ -21,7 +21,7 @@ XF FullPage Capture 1.0.0 重点增加了分节截图管理和分节合并编辑
 
 完整介绍：
 
-XF FullPage Capture 是一个本地优先的网页长截图、裁切、分页和分节合并导出工具，帮助用户在浏览器中捕获完整网页，并将结果导出为 PNG、JPEG、分页图片或 PDF。
+ScrollCatch — Full Page Capture 是一个本地优先的网页长截图、裁切、分页和分节合并导出工具，帮助用户在浏览器中捕获完整网页，并将结果导出为 PNG、JPEG、分页图片或 PDF。
 
 它适合用于保存长网页、在线文档、知识库页面、教程资料、研究材料、订单记录、网页报告、微信公众号文章，以及普通截图无法一次完整保存的页面。
 
@@ -62,16 +62,16 @@ XF FullPage Capture 是一个本地优先的网页长截图、裁切、分页和
 插件不能直接在微信 App 内置浏览器中运行。需要保存微信公众号文章时，请先用默认浏览器打开文章，或复制文章链接到 Chrome、Edge、Atlas 等 Chromium 浏览器中使用。
 
 隐私说明：
-XF FullPage Capture 采用本地优先设计。截图数据、编辑草稿和本地缓存保存在浏览器扩展的本地存储中，不会上传到任何外部服务器。
+ScrollCatch — Full Page Capture 采用本地优先设计。截图数据、编辑草稿和本地缓存保存在浏览器扩展的本地存储中，不会上传到任何外部服务器。
 
 
 English Description:
 
 What's new:
 
-XF FullPage Capture 1.0.0 adds section management and a section merge editor for very long pages that cannot be captured comfortably in one pass. It is designed for long articles, online documents, knowledge base pages, research materials, and other pages that may need to be captured in multiple sections.
+ScrollCatch — Full Page Capture 1.0.0 adds section management and a section merge editor for very long pages that cannot be captured comfortably in one pass. It is designed for long articles, online documents, knowledge base pages, research materials, and other pages that may need to be captured in multiple sections.
 
-The extension now provides a safer segmented capture workflow. When a page is too long, XF FullPage Capture captures it within a practical section limit instead of forcing the browser to create an extremely tall canvas. After a section is complete, users can export the current result or continue capturing from the previous end position.
+The extension now provides a safer segmented capture workflow. When a page is too long, ScrollCatch — Full Page Capture captures it within a practical section limit instead of forcing the browser to create an extremely tall canvas. After a section is complete, users can export the current result or continue capturing from the previous end position.
 
 The new section merge editor lets users manage multiple captured sections in one place. It supports side-by-side comparison, single-column browsing, automatic layout, preview zoom, and fit-to-width viewing. Each section can be adjusted independently, including crop area, export scale, and custom page-break lines. Users can also apply the current section's settings to all sections when they want a consistent layout.
 
@@ -88,7 +88,7 @@ If a page is captured fully in one pass, users can usually crop, paginate, and e
 
 Full description:
 
-XF FullPage Capture is a local-first full-page screenshot, cropping, pagination, and section merge export tool for Chromium-based browsers.
+ScrollCatch — Full Page Capture is a local-first full-page screenshot, cropping, pagination, and section merge export tool for Chromium-based browsers.
 
 It helps users capture complete web pages, preview the result locally, crop the area they want to keep, adjust page breaks, and export the final result as PNG, JPEG, paginated images, or PDF.
 
@@ -122,7 +122,7 @@ About section merging:
 Section merging is mainly for very long pages that cannot be captured completely in one pass. Users can capture the first part, continue from the previous end position, and then open the merge editor after multiple sections are available. In the merge editor, each section can be adjusted independently or synchronized with the current section's settings. The final output can be a paginated PNG ZIP, paginated JPEG ZIP, or one merged PDF.
 
 About PDF export:
-Custom page-break lines help users control where each page is split. For PDF export, XF FullPage Capture provides page reference zones and real-time warnings to reduce the risk of compression, stretching, or excessive blank space. For the most stable PDF result, users can also export paginated PNG images first and then merge those images into a PDF.
+Custom page-break lines help users control where each page is split. For PDF export, ScrollCatch — Full Page Capture provides page reference zones and real-time warnings to reduce the risk of compression, stretching, or excessive blank space. For the most stable PDF result, users can also export paginated PNG images first and then merge those images into a PDF.
 
 About long-page preview quality:
 For very long captures, the workspace preview may be downscaled to keep the browser responsive. A slightly blurred preview is normal. Paginated PNG, paginated JPEG, and paginated PDF exports are rendered from the original screenshot slices, so the paginated export quality is not reduced by preview downscaling.
@@ -131,4 +131,4 @@ Note:
 This extension cannot run inside the WeChat app's built-in browser. To capture a WeChat Official Account article, open the article in the default browser or copy the article URL into Chrome, Edge, Atlas, or another Chromium-based browser before using the extension.
 
 Privacy:
-XF FullPage Capture is local-first. Screenshot data, editing drafts, and local cache are stored in the browser extension's local storage and are not uploaded to any external server.
+ScrollCatch — Full Page Capture is local-first. Screenshot data, editing drafts, and local cache are stored in the browser extension's local storage and are not uploaded to any external server.

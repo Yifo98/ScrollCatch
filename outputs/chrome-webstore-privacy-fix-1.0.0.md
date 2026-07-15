@@ -1,6 +1,6 @@
 # Chrome Web Store privacy fix checklist
 
-Product: XF FullPage Capture Sections
+Product: ScrollCatch — Full Page Capture
 Rejected revision date: 2026-06-10
 Violation reference ID: Purple Nickel
 
@@ -12,7 +12,7 @@ The rejection email says the privacy policy link is broken or inaccessible. The 
 
 After `PRIVACY.md` is committed and pushed to the public repository, use this URL in the Chrome Web Store Developer Dashboard privacy policy field:
 
-https://github.com/Yifo98/XF-FullPage-Capture/blob/main/PRIVACY.md
+https://github.com/Yifo98/ScrollCatch/blob/main/PRIVACY.md
 
 Do not use a local file path or an unpublished draft URL.
 
@@ -28,7 +28,7 @@ Do not use a local file path or an unpublished draft URL.
    - Handles website content only for user-initiated screenshot capture.
    - Stores screenshot cache and editing drafts locally in extension storage.
 5. Save draft.
-6. Re-upload the rebuilt `dist/XF-FullPage-Capture-1.0.0.zip` if the dashboard requires a new package revision.
+6. Re-upload the rebuilt `dist/ScrollCatch-1.0.0.zip` if the dashboard requires a new package revision.
 7. Submit for review.
 
 ## Suggested privacy/data disclosure wording

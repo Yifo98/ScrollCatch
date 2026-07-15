@@ -1,12 +1,16 @@
 (() => {
   "use strict";
 
-  const STORAGE_KEY = "xfFullPageCapture:locale";
+  const STORAGE_KEY = "scrollCatch:locale";
+  const LEGACY_STORAGE_KEY = "xfFullPageCapture:locale";
   const DEFAULT_LOCALE = "en";
   const SUPPORTED_LOCALES = new Set(["zh-CN", "en"]);
 
   const EN = {
     "ScrollCatch 编辑工作台": "ScrollCatch Edit Workbench",
+    "ScrollCatch · 收": "ScrollCatch · 收",
+    "收其全貌，存其有度。": "Capture the whole, preserve with restraint.",
+    "A QIDU Utility": "A QIDU Utility",
     "把整页，完整带走": "Capture the whole page",
     "截图操作": "Capture actions",
     "截取完整页面": "Capture full page",
@@ -583,8 +587,12 @@
     if (!readyPromise) {
       readyPromise = (async () => {
         try {
-          const stored = await globalThis.chrome?.storage?.local?.get?.(STORAGE_KEY);
-          locale = normalizeLocale(stored?.[STORAGE_KEY]);
+          const stored = await globalThis.chrome?.storage?.local?.get?.([STORAGE_KEY, LEGACY_STORAGE_KEY]);
+          const storedLocale = stored?.[STORAGE_KEY] ?? stored?.[LEGACY_STORAGE_KEY];
+          locale = normalizeLocale(storedLocale);
+          if (!stored?.[STORAGE_KEY] && stored?.[LEGACY_STORAGE_KEY]) {
+            await globalThis.chrome?.storage?.local?.set?.({ [STORAGE_KEY]: locale });
+          }
         } catch (_error) {
           locale = DEFAULT_LOCALE;
         }
@@ -641,10 +649,10 @@
     }
     installStorageListener.installed = true;
     changed.addListener((changes, areaName) => {
-      if (areaName !== "local" || !changes?.[STORAGE_KEY]) {
+      if (areaName !== "local" || (!changes?.[STORAGE_KEY] && !changes?.[LEGACY_STORAGE_KEY])) {
         return;
       }
-      const next = normalizeLocale(changes[STORAGE_KEY].newValue);
+      const next = normalizeLocale((changes[STORAGE_KEY] ?? changes[LEGACY_STORAGE_KEY]).newValue);
       if (next === locale) {
         return;
       }

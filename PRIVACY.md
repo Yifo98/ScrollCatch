@@ -2,7 +2,7 @@
 
 Last updated: 2026-07-15
 
-This policy applies to ScrollCatch — Full Page Capture (formerly XF FullPage Capture).
+This policy applies to ScrollCatch — Full Page Capture.
 
 ## Summary
 
@@ -76,7 +76,7 @@ This policy may be updated when the extension's data handling or features change
 
 For privacy questions or support, use the public GitHub issue tracker:
 
-https://github.com/Yifo98/XF-FullPage-Capture/issues
+https://github.com/Yifo98/ScrollCatch/issues
 
 ---
 
@@ -84,7 +84,7 @@ https://github.com/Yifo98/XF-FullPage-Capture/issues
 
 最后更新：2026-07-15
 
-本政策适用于 ScrollCatch — Full Page Capture（原 XF FullPage Capture）。
+本政策适用于 ScrollCatch — Full Page Capture。
 
 ## 概要
 
@@ -160,4 +160,4 @@ The use of information received from Google APIs will adhere to the Chrome Web S
 
 隐私问题或支持请求可以通过公开 GitHub Issue 提交：
 
-https://github.com/Yifo98/XF-FullPage-Capture/issues
+https://github.com/Yifo98/ScrollCatch/issues

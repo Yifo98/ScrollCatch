@@ -89,7 +89,8 @@ const paperSizes = {
 };
 
 const EDITOR_STATE_VERSION = 1;
-const EDITOR_STATE_PREFIX = "xfFullPageCapture:editor:";
+const EDITOR_STATE_PREFIX = "scrollCatch:editor:";
+const LEGACY_EDITOR_STATE_PREFIX = "xfFullPageCapture:editor:";
 const PREVIEW_PIXEL_BUDGET = 32_000_000;
 const THUMBNAIL_PIXEL_BUDGET = 1_000_000;
 const THUMBNAIL_MAX_SIDE = 8192;
@@ -592,7 +593,9 @@ function renderCapturePicker() {
     meta.className = "capture-picker-meta";
     meta.textContent = [
       sections.some((section) => section.id === item.id) ? t("当前组合") : t("其他历史截图"),
-      item.captureStrategy === "pages" ? `${item.pageCount || item.sliceCount || 0} 页` : `${item.sliceCount || 0} 张切片`,
+      item.captureStrategy === "pages"
+        ? t(`${item.pageCount || item.sliceCount || 0} 页`)
+        : t(`${item.sliceCount || 0} 张切片`),
       formatDateTime(item.capturedAt)
     ].join(" · ");
     body.append(title, meta);
@@ -2095,7 +2098,8 @@ function normalizeEditorState(section, savedState) {
 
 function readSavedEditorState(id) {
   try {
-    const raw = localStorage.getItem(`${EDITOR_STATE_PREFIX}${id}`);
+    const raw = localStorage.getItem(`${EDITOR_STATE_PREFIX}${id}`)
+      ?? localStorage.getItem(`${LEGACY_EDITOR_STATE_PREFIX}${id}`);
     if (!raw) {
       return null;
     }
@@ -2492,7 +2496,7 @@ function sectionMetaText(section, index) {
   return [
     t(`第 ${Number(index) + 1} 段`),
     formatDateTime(section.capture.capturedAt),
-    `${section.capture.slices?.length || 0} 张切片`,
+    t(`${section.capture.slices?.length || 0} 张切片`),
     `${Math.round((section.capture.target?.totalHeight || 0) / 100) / 10}k px`
   ].filter(Boolean).join(" · ");
 }
@@ -2712,6 +2716,7 @@ async function deleteSelectedCaches(options = {}) {
       }
       deletedCacheIds.add(id);
       localStorage.removeItem(`${EDITOR_STATE_PREFIX}${id}`);
+      localStorage.removeItem(`${LEGACY_EDITOR_STATE_PREFIX}${id}`);
     } catch (error) {
       failures.push({ id, error });
     }
@@ -2755,6 +2760,7 @@ async function deleteOtherCaptureCaches() {
           throw new Error(response?.error || "Could not delete cached capture.");
         }
         localStorage.removeItem(`${EDITOR_STATE_PREFIX}${id}`);
+        localStorage.removeItem(`${LEGACY_EDITOR_STATE_PREFIX}${id}`);
         removed += 1;
       } catch (error) {
         failures.push({ id, error });

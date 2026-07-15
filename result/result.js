@@ -106,8 +106,10 @@ let activeSectionId = "";
 let quickPreviewPlan = { ids: [], pixelBudgetPerSection: 8_000_000 };
 
 const EDITOR_STATE_VERSION = 1;
-const EDITOR_STATE_PREFIX = "xfFullPageCapture:editor:";
-const LIFECYCLE_STATE_PREFIX = "xfFullPageCapture:lifecycle:";
+const EDITOR_STATE_PREFIX = "scrollCatch:editor:";
+const LEGACY_EDITOR_STATE_PREFIX = "xfFullPageCapture:editor:";
+const LIFECYCLE_STATE_PREFIX = "scrollCatch:lifecycle:";
+const LEGACY_LIFECYCLE_STATE_PREFIX = "xfFullPageCapture:lifecycle:";
 const LIFECYCLE_HISTORY_LIMIT = 24;
 const MAX_CANVAS_PIXELS = 220_000_000;
 const PREVIEW_PIXEL_BUDGET = 32_000_000;
@@ -778,7 +780,8 @@ function readPreviousLifecycleEvent() {
     return null;
   }
   try {
-    const raw = localStorage.getItem(lifecycleStateKey());
+    const raw = localStorage.getItem(lifecycleStateKey())
+      ?? localStorage.getItem(`${LEGACY_LIFECYCLE_STATE_PREFIX}${captureId}`);
     return raw ? JSON.parse(raw) : null;
   } catch {
     return null;
@@ -955,7 +958,8 @@ function readSavedEditorState() {
 
 function readSavedEditorStateForCapture(targetCaptureId) {
   try {
-    const raw = localStorage.getItem(editorStateKeyForCapture(targetCaptureId));
+    const raw = localStorage.getItem(editorStateKeyForCapture(targetCaptureId))
+      ?? localStorage.getItem(`${LEGACY_EDITOR_STATE_PREFIX}${targetCaptureId}`);
     if (!raw) {
       return null;
     }
@@ -1504,7 +1508,9 @@ async function clearAllCaptureCaches() {
 function removeLocalCaptureState(id) {
   try {
     localStorage.removeItem(`${EDITOR_STATE_PREFIX}${id}`);
+    localStorage.removeItem(`${LEGACY_EDITOR_STATE_PREFIX}${id}`);
     localStorage.removeItem(`${LIFECYCLE_STATE_PREFIX}${id}`);
+    localStorage.removeItem(`${LEGACY_LIFECYCLE_STATE_PREFIX}${id}`);
   } catch (error) {
     console.warn("Could not remove local capture state.", error);
   }

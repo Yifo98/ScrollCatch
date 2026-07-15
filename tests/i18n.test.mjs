@@ -3,10 +3,12 @@ import fs from "node:fs/promises";
 import test from "node:test";
 import vm from "node:vm";
 
-async function createI18n(storedLocale = null) {
+async function createI18n(storedLocale = null, { legacy = false } = {}) {
   const writes = [];
   const listeners = [];
-  const storage = storedLocale ? { "xfFullPageCapture:locale": storedLocale } : {};
+  const storage = storedLocale
+    ? { [legacy ? "xfFullPageCapture:locale" : "scrollCatch:locale"]: storedLocale }
+    : {};
   const context = vm.createContext({
     chrome: {
       storage: {
@@ -50,19 +52,27 @@ test("interface locale defaults to English and restores a saved Chinese choice",
 test("choosing Chinese persists and is restored on the next open", async () => {
   const firstOpen = await createI18n();
   await firstOpen.i18n.setLocale("zh-CN");
-  assert.equal(firstOpen.storage["xfFullPageCapture:locale"], "zh-CN");
+  assert.equal(firstOpen.storage["scrollCatch:locale"], "zh-CN");
 
-  const nextOpen = await createI18n(firstOpen.storage["xfFullPageCapture:locale"]);
+  const nextOpen = await createI18n(firstOpen.storage["scrollCatch:locale"]);
   assert.equal(nextOpen.i18n.getLocale(), "zh-CN");
   assert.equal(nextOpen.i18n.translateText("保存 PNG"), "保存 PNG");
+});
+
+test("an existing language choice migrates from the previous project namespace", async () => {
+  const migrated = await createI18n("zh-CN", { legacy: true });
+
+  assert.equal(migrated.i18n.getLocale(), "zh-CN");
+  assert.equal(migrated.storage["scrollCatch:locale"], "zh-CN");
+  assert.equal(migrated.writes.at(-1)["scrollCatch:locale"], "zh-CN");
 });
 
 test("switching language persists the choice and translates dynamic workbench copy", async () => {
   const { i18n, storage, writes } = await createI18n();
   await i18n.setLocale("en");
 
-  assert.equal(storage["xfFullPageCapture:locale"], "en");
-  assert.equal(writes.at(-1)["xfFullPageCapture:locale"], "en");
+  assert.equal(storage["scrollCatch:locale"], "en");
+  assert.equal(writes.at(-1)["scrollCatch:locale"], "en");
   assert.equal(
     i18n.translateText("已加载 3 段。当前只保留正在编辑分段的高清预览。"),
     "3 sections loaded. Only the active section keeps a high-resolution preview."
@@ -128,5 +138,5 @@ test("extension pages and package include the bilingual runtime", async () => {
   assert.match(packageScript, /_locales/);
   assert.match(packageScript, /shared/);
   assert.match(captureTarget, /function normalizeInterfaceLocale\(value\)/);
-  assert.match(captureTarget, /normalizeInterfaceLocale\(changes\[LOCALE_STORAGE_KEY\]\.newValue\)/);
+  assert.match(captureTarget, /normalizeInterfaceLocale\(localeChange\.newValue\)/);
 });

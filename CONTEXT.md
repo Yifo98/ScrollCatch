@@ -1,4 +1,4 @@
-# ScrollCatch（原 XF FullPage Capture）产品语境
+# ScrollCatch 产品语境
 
 本语境用于区分已经稳定交付的版本与正在设计的后续版本，避免迭代工作模糊稳定发布和开发状态的边界。
 

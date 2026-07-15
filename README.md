@@ -1,19 +1,35 @@
 # ScrollCatch — Full Page Capture
 
-一个以完整网页截图为核心的 Chromium 浏览器扩展。GitHub 最新版本为 `1.1.0`；Chrome Web Store 当前仍为 `1.0.2`，商店更新单独进行。
+> 收其全貌，存其有度。 · Capture the whole, preserve with restraint. · A QIDU Utility
+
+一个以完整网页截图为核心的 Chromium 浏览器扩展。当前发布版本为 `1.2.0`。
 
 隐私政策：[`PRIVACY.md`](./PRIVACY.md)
 
-GitHub：<https://github.com/Yifo98/XF-FullPage-Capture>
+GitHub：<https://github.com/Yifo98/ScrollCatch>
 
-## 1.1.0 更新摘要
+## 1.2.0 更新摘要
 
-- 产品名称和图标更新为 `ScrollCatch — Full Page Capture`，默认使用 English，并记忆用户选择的中文界面。
+- 使用最终 QIDU 方向完成品牌升级，统一暖白、琥珀金、炭黑界面与卷轴图标。
+- 项目目录和 GitHub 仓库统一更名为 `ScrollCatch`，并保留旧版语言选择和编辑草稿的兼容读取。
+- 产品名称保持 `ScrollCatch — Full Page Capture`，默认使用 English，并记忆用户选择的中文界面。
 - 截图后先显示轻量“快速结果”，裁切、自定义分页、多段排序、缓存管理和合并导出集中到统一的编辑工作台。
 - 完善超长页面分段续截、回到原文和保存终点恢复；截图中可用 `Esc` 或浏览器快捷键停止。
 - 多段截图可调整顺序、同步裁切与导出设置，并按每段尺寸重新生成分页线后合并导出 PDF。
 - A3、A4、A5、B5、Letter、Legal、Tabloid 及横竖方向会写入真实 PDF 页面尺寸；工作台同步重算分页参考区。
 - 保留并加强飞书 PPT / Lark 演示文稿按页捕获和分页图片、PDF 导出。
+
+## 界面预览
+
+![ScrollCatch 截图入口](./docs/assets/store/01-capture-actions.png)
+
+![ScrollCatch 快速结果与长页续接](./docs/assets/store/02-quick-result.png)
+
+![ScrollCatch 统一编辑工作台](./docs/assets/store/03-edit-workbench.png)
+
+![ScrollCatch 自由裁切与自定义分页](./docs/assets/store/04-crop-pagination.png)
+
+![ScrollCatch 中英文界面与导出设置](./docs/assets/store/05-language-export.png)
 
 适用浏览器：
 
@@ -64,27 +80,27 @@ GitHub：<https://github.com/Yifo98/XF-FullPage-Capture>
 
 ### Chrome
 
-1. 解压 `ScrollCatch-1.1.0.zip`。
+1. 解压 `ScrollCatch-1.2.0.zip`。
 2. 打开 `chrome://extensions/`。
 3. 打开右上角 `Developer mode`。
 4. 点击 `Load unpacked`。
-5. 选择解压后的 `ScrollCatch-1.1.0` 文件夹。
+5. 选择解压后的 `ScrollCatch-1.2.0` 文件夹。
 
 ### Edge
 
-1. 解压 `ScrollCatch-1.1.0.zip`。
+1. 解压 `ScrollCatch-1.2.0.zip`。
 2. 打开 `edge://extensions/`。
 3. 打开 `Developer mode`。
 4. 点击 `Load unpacked`。
-5. 选择解压后的 `ScrollCatch-1.1.0` 文件夹。
+5. 选择解压后的 `ScrollCatch-1.2.0` 文件夹。
 
 ### Atlas
 
-1. 解压 `ScrollCatch-1.1.0.zip`。
+1. 解压 `ScrollCatch-1.2.0.zip`。
 2. 优先尝试打开 `chrome://extensions/`。
 3. 如果没有进入扩展管理页，就从浏览器工具栏的扩展入口进入管理页面。
 4. 打开开发者模式后，选择 `Load unpacked`。
-5. 选择解压后的 `ScrollCatch-1.1.0` 文件夹。
+5. 选择解压后的 `ScrollCatch-1.2.0` 文件夹。
 
 ## 使用
 

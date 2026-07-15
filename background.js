@@ -17,17 +17,19 @@ const CAPTURE_INDEX_KEY = "xfCaptureIndex";
 const MAX_STORED_CAPTURES = 12;
 const PENDING_CONTINUATION_PREFIX = "xfPendingContinuation:";
 const PENDING_CONTINUATION_MAX_AGE_MS = 30 * 60 * 1000;
-const INTERFACE_LOCALE_KEY = "xfFullPageCapture:locale";
+const INTERFACE_LOCALE_KEY = "scrollCatch:locale";
+const LEGACY_INTERFACE_LOCALE_KEY = "xfFullPageCapture:locale";
 const pendingContinuations = new Map();
 let interfaceLocale = "en";
 
-Promise.resolve(chrome.storage?.local?.get?.(INTERFACE_LOCALE_KEY))
-  .then((stored) => updateActionTitle(stored?.[INTERFACE_LOCALE_KEY]))
+Promise.resolve(chrome.storage?.local?.get?.([INTERFACE_LOCALE_KEY, LEGACY_INTERFACE_LOCALE_KEY]))
+  .then((stored) => updateActionTitle(stored?.[INTERFACE_LOCALE_KEY] ?? stored?.[LEGACY_INTERFACE_LOCALE_KEY]))
   .catch(() => {});
 
 chrome.storage?.onChanged?.addListener?.((changes, areaName) => {
-  if (areaName === "local" && changes?.[INTERFACE_LOCALE_KEY]) {
-    updateActionTitle(changes[INTERFACE_LOCALE_KEY].newValue);
+  const localeChange = changes?.[INTERFACE_LOCALE_KEY] ?? changes?.[LEGACY_INTERFACE_LOCALE_KEY];
+  if (areaName === "local" && localeChange) {
+    updateActionTitle(localeChange.newValue);
   }
 });
 

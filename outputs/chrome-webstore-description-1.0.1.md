@@ -2,7 +2,7 @@
 
 本次更新：
 
-XF FullPage Capture 1.0.1 是一次体验优化版本，重点改进截图结果页和分节合并编辑器里的自定义分页线、快捷键提示和加载反馈。
+ScrollCatch — Full Page Capture 1.0.1 是一次体验优化版本，重点改进截图结果页和分节合并编辑器里的自定义分页线、快捷键提示和加载反馈。
 
 新版优化了自定义分页线的可操作性。普通结果页和分节合并编辑器中的分页线都更细、更不遮挡正文内容，同时保留足够的拖拽热区，方便用户在裁切框内部直接拖动分页线。选中分页线后，界面会高亮当前线，并支持 Delete 或 Backspace 删除。
 
@@ -21,7 +21,7 @@ XF FullPage Capture 1.0.1 是一次体验优化版本，重点改进截图结果
 
 完整介绍：
 
-XF FullPage Capture 是一个本地优先的网页长截图、裁切、分页和分节合并导出工具，帮助用户在浏览器中捕获完整网页，并将结果导出为 PNG、JPEG、分页图片或 PDF。
+ScrollCatch — Full Page Capture 是一个本地优先的网页长截图、裁切、分页和分节合并导出工具，帮助用户在浏览器中捕获完整网页，并将结果导出为 PNG、JPEG、分页图片或 PDF。
 
 它适合用于保存长网页、在线文档、知识库页面、教程资料、研究材料、订单记录、网页报告、微信公众号文章，以及普通截图无法一次完整保存的页面。
 
@@ -62,17 +62,17 @@ XF FullPage Capture 是一个本地优先的网页长截图、裁切、分页和
 插件不能直接在微信 App 内置浏览器中运行。需要保存微信公众号文章时，请先用默认浏览器打开文章，或复制文章链接到 Chrome、Edge、Atlas 等 Chromium 浏览器中使用。
 
 隐私说明：
-XF FullPage Capture 采用本地优先设计。截图数据、编辑草稿和本地缓存保存在浏览器扩展的本地存储中，不会上传到任何外部服务器。
+ScrollCatch — Full Page Capture 采用本地优先设计。截图数据、编辑草稿和本地缓存保存在浏览器扩展的本地存储中，不会上传到任何外部服务器。
 
 项目主页：
-https://github.com/Yifo98/XF-FullPage-Capture
+https://github.com/Yifo98/ScrollCatch
 
 
 English Description:
 
 What's new:
 
-XF FullPage Capture 1.0.1 is a usability update focused on custom page-break lines, shortcut guidance, and loading feedback in the normal result page and the section merge editor.
+ScrollCatch — Full Page Capture 1.0.1 is a usability update focused on custom page-break lines, shortcut guidance, and loading feedback in the normal result page and the section merge editor.
 
 Custom page-break editing is now easier to use. Page-break lines are thinner so they cover less page content, while keeping a practical drag area so users can drag them inside the crop area. The selected line is highlighted, and users can delete it with Delete or Backspace.
 
@@ -91,7 +91,7 @@ If a page is captured fully in one pass, users can usually crop, paginate, and e
 
 Full description:
 
-XF FullPage Capture is a local-first full-page screenshot, cropping, pagination, and section merge export tool for Chromium-based browsers.
+ScrollCatch — Full Page Capture is a local-first full-page screenshot, cropping, pagination, and section merge export tool for Chromium-based browsers.
 
 It helps users capture complete web pages, preview the result locally, crop the area they want to keep, adjust page breaks, and export the final result as PNG, JPEG, paginated images, or PDF.
 
@@ -125,7 +125,7 @@ About section merging:
 Section merging is mainly for very long pages that cannot be captured completely in one pass. Users can capture the first part, continue from the previous end position, and then open the merge editor after multiple sections are available. In the merge editor, each section can be adjusted independently or synchronized with the current section's settings. The final output can be a paginated PNG ZIP, paginated JPEG ZIP, or one merged PDF.
 
 About PDF export:
-Custom page-break lines help users control where each page is split. For PDF export, XF FullPage Capture provides page reference zones and real-time warnings to reduce the risk of compression, stretching, or excessive blank space. For the most stable PDF result, users can also export paginated PNG images first and then merge those images into a PDF.
+Custom page-break lines help users control where each page is split. For PDF export, ScrollCatch — Full Page Capture provides page reference zones and real-time warnings to reduce the risk of compression, stretching, or excessive blank space. For the most stable PDF result, users can also export paginated PNG images first and then merge those images into a PDF.
 
 About long-page preview quality:
 For very long captures, the workspace preview may be downscaled to keep the browser responsive. A slightly blurred preview is normal. Paginated PNG, paginated JPEG, and paginated PDF exports are rendered from the original screenshot slices, so the paginated export quality is not reduced by preview downscaling.
@@ -134,7 +134,7 @@ Note:
 This extension cannot run inside the WeChat app's built-in browser. To capture a WeChat Official Account article, open the article in the default browser or copy the article URL into Chrome, Edge, Atlas, or another Chromium-based browser before using the extension.
 
 Privacy:
-XF FullPage Capture is local-first. Screenshot data, editing drafts, and local cache are stored in the browser extension's local storage and are not uploaded to any external server.
+ScrollCatch — Full Page Capture is local-first. Screenshot data, editing drafts, and local cache are stored in the browser extension's local storage and are not uploaded to any external server.
 
 Project homepage:
-https://github.com/Yifo98/XF-FullPage-Capture
+https://github.com/Yifo98/ScrollCatch

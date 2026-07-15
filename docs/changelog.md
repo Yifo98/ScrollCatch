@@ -1,5 +1,16 @@
 # Changelog
 
+## 1.2.0（2026-07-15）
+
+- 按最终视觉方向板完成 QIDU 品牌升级：使用暖白、琥珀金与炭黑视觉体系，并在弹窗、快速结果和编辑工作台统一展示 `ScrollCatch · 收`。
+- 全套 16、32、48、128 像素扩展图标由同一份 512 像素卷轴母版生成，提升浏览器工具栏中的辨识度。
+- 加入品牌文案 `收其全貌，存其有度。 / Capture the whole, preserve with restraint.` 与 `A QIDU Utility`。
+- 本地项目目录由 `XF-FullPage-Capture` 更名为 `ScrollCatch`，GitHub 仓库同步更名为 `Yifo98/ScrollCatch`，README、隐私政策、商店文案和发布脚本链接全部同步。
+- 新的语言、编辑草稿和页面生命周期状态使用 `scrollCatch:*` 命名空间；升级时仍能读取旧命名空间中的语言选择和编辑草稿，避免用户设置丢失。
+- 保留长页续接、Esc 停止、框选范围、飞书 / Lark PPT 逐页捕获、自由裁切、自定义分页、多段排序、缓存管理和 PDF 导出能力。
+- 默认界面保持 English，用户主动切换中文后继续在浏览器本机记忆选择。
+- 版本升级为 `1.2.0`，用于 GitHub Release 与 Chrome Web Store 新包发布。
+
 ## 1.1.0（2026-07-15）
 
 - 产品名称更新为 `ScrollCatch — Full Page Capture`；初步重名检索后避开已有的 `PageLoop` 与 `SnapWeave`。
