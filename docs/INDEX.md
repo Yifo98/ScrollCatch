@@ -21,6 +21,7 @@
 - [ADR-0003](./adr/0003-separate-quick-results-from-advanced-editing.md)：分离快速结果与编辑工作台。
 - [ADR-0004](./adr/0004-show-progressive-results-before-full-composition.md)：在完整拼接前显示渐进结果。
 - [ADR-0005](./adr/0005-only-keep-the-active-section-in-high-resolution.md)：只让活动分节保留高清交互预览。
-- [ADR-0006](./adr/0006-use-caught-sections-as-the-product-icon.md)：统一使用 Caught Sections 产品图标。
+- [ADR-0006](./adr/0006-use-caught-sections-as-the-product-icon.md)：旧 Caught Sections 图标决策，已由 ADR-0009 取代。
 - [ADR-0007](./adr/0007-unify-single-and-continuous-capture-editing.md)：单段与连续截图共用一个编辑工作台入口。
 - [ADR-0008](./adr/0008-reduce-the-workbench-to-three-core-tools.md)：工作台只保留自由裁切、自定义分页和导出三个核心工具组。
+- [ADR-0009](./adr/0009-adopt-the-qidu-scrollcatch-brand-system.md)：采用最终 QIDU 卷轴图标和暖白、琥珀金、炭黑品牌体系。

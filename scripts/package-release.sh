@@ -29,12 +29,15 @@ rsync -a \
   background.js \
   content \
   _locales \
-  docs \
   icons \
   popup \
   result \
   shared \
   "${release_dir}/"
+
+# Store screenshots are published from the repository and uploaded to the
+# Chrome Web Store, but are not runtime extension files.
+rsync -a --exclude "assets/store/" docs "${release_dir}/"
 
 required_paths=(
   "manifest.json"

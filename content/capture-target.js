@@ -36,6 +36,10 @@
   }
   if (typeof window.__scrollCatchCleanup === "function") {
     window.__scrollCatchCleanup();
+  } else if (typeof window.__xfFullPageCaptureCleanup === "function") {
+    // Clean an already injected pre-ScrollCatch script during an in-place
+    // extension upgrade so its listeners and capture overlay cannot survive.
+    window.__xfFullPageCaptureCleanup();
   }
   window.__scrollCatchVersion = VERSION;
 
@@ -149,11 +153,16 @@
   }
 
   chrome.runtime.onMessage.addListener(handleMessage);
-  window.__scrollCatchCleanup = () => {
+  const cleanupCaptureTarget = () => {
     chrome.runtime.onMessage.removeListener(handleMessage);
     cancelStartPicker();
     restoreCapture();
   };
+  window.__scrollCatchCleanup = cleanupCaptureTarget;
+  // Keep the rollback hook compatible with tabs that were opened before the
+  // project identity migration.
+  window.__xfFullPageCaptureCleanup = cleanupCaptureTarget;
+  window.__xfFullPageCaptureVersion = VERSION;
 
   async function measureCapture(options = {}) {
     const captureProfile = normalizeCaptureProfile(options.captureProfile);

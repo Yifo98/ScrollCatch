@@ -56,6 +56,12 @@ test("the release script validates every new runtime dependency", async () => {
   }
 });
 
+test("store screenshots stay in the repository but outside the extension ZIP", async () => {
+  const source = await read("scripts/package-release.sh");
+
+  assert.match(source, /rsync -a --exclude "assets\/store\/" docs/);
+});
+
 test("local browser profiles, screenshots, and design QA stay outside source and release packages", async () => {
   const [gitignore, releaseScript] = await Promise.all([
     read(".gitignore"),
