@@ -6,7 +6,7 @@
     "message": "ScrollCatch"
   },
   "extensionDescription": {
-    "message": "Capture full web pages with long-page continuation, slide-by-slide presentation capture, cropping, pagination, section management, and export."
+    "message": "Capture full web pages with continuation, slide-by-slide presentations, cropping, pagination, section merging, and PDF/image export."
   },
   "actionTitle": {
     "message": "ScrollCatch: Capture full page"
