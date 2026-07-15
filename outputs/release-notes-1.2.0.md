@@ -13,7 +13,7 @@ ScrollCatch 1.2.0 completes the product identity refresh while preserving the ma
 
 ## Validation
 
-- 68 automated tests passed.
+- 69 automated tests passed.
 - A public 100,873 px long-page fixture completed across linked sections.
 - A4 portrait and A3 landscape exports produced the correct PDF page dimensions.
 - The packaged extension loaded successfully in a clean Chromium profile.
