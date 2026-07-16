@@ -9,6 +9,7 @@
 ## 排查记录
 
 - [截图速度与 PPT 页码跳转](./troubleshooting/capture-speed-and-ppt-navigation.md)：说明长网页截图慢的原因、预加载建议，以及 Windows 端 PPT 页码跳转失败的处理。
+- [Windows Smart App Control 兼容性](./windows-smart-app-control.md)：说明 EXE/MSI、BAT/CMD 的真实安全边界，以及 ScrollCatch 继续保持纯浏览器扩展发布的原因。
 
 ## 变更记录
 

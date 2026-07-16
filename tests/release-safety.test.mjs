@@ -62,6 +62,28 @@ test("store screenshots stay in the repository but outside the extension ZIP", a
   assert.match(source, /rsync -a --exclude "assets\/store\/" docs/);
 });
 
+test("browser-extension releases reject Windows executables, installers, and launcher wrappers", async () => {
+  const source = await read("scripts/package-release.sh");
+
+  for (const extension of [
+    "*.exe",
+    "*.com",
+    "*.dll",
+    "*.msi",
+    "*.msp",
+    "*.mst",
+    "*.msix",
+    "*.appx",
+    "*.bat",
+    "*.cmd",
+    "*.ps1"
+  ]) {
+    assert.ok(source.includes(`-iname \"${extension}\"`), extension);
+  }
+
+  assert.match(source, /Unexpected Windows executable, installer, or launcher/);
+});
+
 test("local browser profiles, screenshots, and design QA stay outside source and release packages", async () => {
   const [gitignore, releaseScript] = await Promise.all([
     read(".gitignore"),

@@ -57,6 +57,30 @@ for required_path in "${required_paths[@]}"; do
   fi
 done
 
+# ScrollCatch is a browser extension, not a native Windows application. Keep
+# release ZIPs free of executable installers and launcher wrappers so Windows
+# users install from the Web Store or load the unpacked extension directly.
+forbidden_windows_artifact="$(
+  find "${release_dir}" -type f \( \
+    -iname "*.exe" -o \
+    -iname "*.com" -o \
+    -iname "*.dll" -o \
+    -iname "*.msi" -o \
+    -iname "*.msp" -o \
+    -iname "*.mst" -o \
+    -iname "*.msix" -o \
+    -iname "*.appx" -o \
+    -iname "*.bat" -o \
+    -iname "*.cmd" -o \
+    -iname "*.ps1" \
+  \) -print -quit
+)"
+
+if [[ -n "${forbidden_windows_artifact}" ]]; then
+  echo "Unexpected Windows executable, installer, or launcher in extension package: ${forbidden_windows_artifact}" >&2
+  exit 1
+fi
+
 (
   cd "${release_dir}"
   zip -qr "../${release_name}.zip" .

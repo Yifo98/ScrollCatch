@@ -102,6 +102,16 @@ GitHub：<https://github.com/Yifo98/ScrollCatch>
 4. 打开开发者模式后，选择 `Load unpacked`。
 5. 选择解压后的 `ScrollCatch-1.2.0` 文件夹。
 
+### Windows 智能应用控制
+
+ScrollCatch 是由 Chrome / Edge 加载的浏览器扩展，不是 Windows 桌面应用。正式发布包只包含扩展所需的 HTML、CSS、JavaScript、图片和清单文件，不包含 `.exe`、`.msi`、`.dll` 或独立启动程序，因此不需要为 ScrollCatch 购买 Windows EXE 代码签名证书。
+
+Windows 用户应优先从 Chrome Web Store 安装；使用 GitHub ZIP 时，解压后按照上面的 Chrome / Edge 步骤选择 `Load unpacked`。ScrollCatch 不需要 BAT 启动器，BAT 也不是绕过 Windows 安全策略的通用方案：它启动的任何原生程序仍会接受对应的应用控制检查。
+
+发布脚本会主动拒绝混入 `.exe`、`.msi`、`.dll`、`.bat`、`.cmd`、`.ps1` 等 Windows 可执行、安装或启动包装，避免未来把浏览器扩展误打包成需要额外信任链的桌面程序。
+
+微软官方规则、BAT 边界和本项目审计结论见 [`docs/windows-smart-app-control.md`](./docs/windows-smart-app-control.md)。
+
 ## 使用
 
 1. 打开需要截图的网页。
@@ -236,7 +246,7 @@ Chrome 不允许扩展在 `chrome://`、Chrome Web Store、浏览器内部设置
 
 ### 打包后朋友怎么安装？
 
-GitHub 最新发布包为 `ScrollCatch-1.1.0.zip`。Chrome Web Store 当前仍为 `1.0.2`；升级商店版本前继续保留 `1.0.2` 作为回退包。
+GitHub 最新发布包为 `ScrollCatch-1.2.0.zip`。朋友可以优先从 Chrome Web Store 安装，或解压 GitHub ZIP 后按本页的 Chrome / Edge 步骤通过扩展管理页加载；无需运行 EXE、安装器或 BAT。
 
 ## 发布打包
 

@@ -1,5 +1,10 @@
 # Changelog
 
+## Unreleased
+
+- Documented the Windows Smart App Control boundary: ScrollCatch is a Chromium extension and does not ship native Windows executables or installers.
+- Added a release-package guard that rejects Windows executables, installers, DLLs, and launcher scripts if they are accidentally introduced in a future extension ZIP.
+
 ## 1.2.0 — 2026-07-15
 
 - Replaced the extension icon set with one amber ScrollCatch production mark derived from the approved QIDU direction board.
