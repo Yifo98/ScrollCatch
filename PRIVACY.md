@@ -1,8 +1,8 @@
-# ScrollCatch — Full Page Capture Privacy Policy
+# ScrollCatch · 收 Privacy Policy
 
-Last updated: 2026-07-15
+Last updated: 2026-07-16
 
-This policy applies to ScrollCatch — Full Page Capture.
+This policy applies to ScrollCatch · 收.
 
 ## Summary
 
@@ -80,11 +80,11 @@ https://github.com/Yifo98/ScrollCatch/issues
 
 ---
 
-# ScrollCatch — Full Page Capture 隐私政策
+# ScrollCatch · 收 隐私政策
 
-最后更新：2026-07-15
+最后更新：2026-07-16
 
-本政策适用于 ScrollCatch — Full Page Capture。
+本政策适用于 ScrollCatch · 收。
 
 ## 概要
 

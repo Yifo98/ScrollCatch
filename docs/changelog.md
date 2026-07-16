@@ -1,5 +1,11 @@
 # Changelog
 
+## 1.2.1（2026-07-16）
+
+- 将扩展安装名称、中英文语言包、Chrome Web Store 标题、GitHub 文档、隐私政策和产品界面统一为唯一正式品牌名 `ScrollCatch · 收`。
+- `Full Page Capture` 保留为功能说明与搜索语义，不再作为正式产品名的一部分。
+- 增加 Windows Smart App Control 发布边界说明，并在打包时拒绝 EXE、MSI、DLL 和启动脚本误混入扩展 ZIP。
+
 ## 1.2.0（2026-07-15）
 
 - 按最终视觉方向板完成 QIDU 品牌升级：使用暖白、琥珀金与炭黑视觉体系，并在弹窗、快速结果和编辑工作台统一展示 `ScrollCatch · 收`。

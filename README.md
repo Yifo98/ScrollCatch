@@ -1,18 +1,19 @@
-# ScrollCatch — Full Page Capture
+# ScrollCatch · 收
 
 > 收其全貌，存其有度。 · Capture the whole, preserve with restraint. · A QIDU Utility
 
-一个以完整网页截图为核心的 Chromium 浏览器扩展。当前发布版本为 `1.2.0`。
+一个以完整网页截图为核心的 Chromium 浏览器扩展。当前发布版本为 `1.2.1`。
 
 隐私政策：[`PRIVACY.md`](./PRIVACY.md)
 
 GitHub：<https://github.com/Yifo98/ScrollCatch>
 
-## 1.2.0 更新摘要
+## 1.2.1 更新摘要
 
+- 扩展、Chrome Web Store、GitHub、隐私政策与产品界面统一使用正式品牌名 `ScrollCatch · 收`；`Full Page Capture` 仅作为功能说明，不再作为产品名的一部分。
 - 使用最终 QIDU 方向完成品牌升级，统一暖白、琥珀金、炭黑界面与卷轴图标。
 - 项目目录和 GitHub 仓库统一更名为 `ScrollCatch`，并保留旧版语言选择和编辑草稿的兼容读取。
-- 产品名称保持 `ScrollCatch — Full Page Capture`，默认使用 English，并记忆用户选择的中文界面。
+- 默认使用 English，并记忆用户选择的中文界面。
 - 截图后先显示轻量“快速结果”，裁切、自定义分页、多段排序、缓存管理和合并导出集中到统一的编辑工作台。
 - 完善超长页面分段续截、回到原文和保存终点恢复；截图中可用 `Esc` 或浏览器快捷键停止。
 - 多段截图可调整顺序、同步裁切与导出设置，并按每段尺寸重新生成分页线后合并导出 PDF。
@@ -80,27 +81,27 @@ GitHub：<https://github.com/Yifo98/ScrollCatch>
 
 ### Chrome
 
-1. 解压 `ScrollCatch-1.2.0.zip`。
+1. 解压 `ScrollCatch-1.2.1.zip`。
 2. 打开 `chrome://extensions/`。
 3. 打开右上角 `Developer mode`。
 4. 点击 `Load unpacked`。
-5. 选择解压后的 `ScrollCatch-1.2.0` 文件夹。
+5. 选择解压后的 `ScrollCatch-1.2.1` 文件夹。
 
 ### Edge
 
-1. 解压 `ScrollCatch-1.2.0.zip`。
+1. 解压 `ScrollCatch-1.2.1.zip`。
 2. 打开 `edge://extensions/`。
 3. 打开 `Developer mode`。
 4. 点击 `Load unpacked`。
-5. 选择解压后的 `ScrollCatch-1.2.0` 文件夹。
+5. 选择解压后的 `ScrollCatch-1.2.1` 文件夹。
 
 ### Atlas
 
-1. 解压 `ScrollCatch-1.2.0.zip`。
+1. 解压 `ScrollCatch-1.2.1.zip`。
 2. 优先尝试打开 `chrome://extensions/`。
 3. 如果没有进入扩展管理页，就从浏览器工具栏的扩展入口进入管理页面。
 4. 打开开发者模式后，选择 `Load unpacked`。
-5. 选择解压后的 `ScrollCatch-1.2.0` 文件夹。
+5. 选择解压后的 `ScrollCatch-1.2.1` 文件夹。
 
 ### Windows 智能应用控制
 
@@ -246,7 +247,7 @@ Chrome 不允许扩展在 `chrome://`、Chrome Web Store、浏览器内部设置
 
 ### 打包后朋友怎么安装？
 
-GitHub 最新发布包为 `ScrollCatch-1.2.0.zip`。朋友可以优先从 Chrome Web Store 安装，或解压 GitHub ZIP 后按本页的 Chrome / Edge 步骤通过扩展管理页加载；无需运行 EXE、安装器或 BAT。
+GitHub 最新发布包为 `ScrollCatch-1.2.1.zip`。朋友可以优先从 Chrome Web Store 安装，或解压 GitHub ZIP 后按本页的 Chrome / Edge 步骤通过扩展管理页加载；无需运行 EXE、安装器或 BAT。
 
 ## 发布打包
 

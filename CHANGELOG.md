@@ -1,7 +1,8 @@
 # Changelog
 
-## Unreleased
+## 1.2.1 — 2026-07-16
 
+- Unified the extension package, Chrome Web Store title, GitHub documentation, privacy policy, and product UI under the canonical brand name `ScrollCatch · 收`.
 - Documented the Windows Smart App Control boundary: ScrollCatch is a Chromium extension and does not ship native Windows executables or installers.
 - Added a release-package guard that rejects Windows executables, installers, DLLs, and launcher scripts if they are accidentally introduced in a future extension ZIP.
 
